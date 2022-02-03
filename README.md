@@ -2,9 +2,23 @@
 
 YOLOv3을 이용한 당구공 탐지 프로그램입니다. PyTorch를 기반으로 짜여진 YOLOv3를 직접 제작한 데이터셋으로 학습시켜 당구공을 object detection하는 모델을 만들었습니다. <br> <br>
 
-데이터셋, 테스트 코드 제작자 : 김민규(minkyu4506@gmail.com)
+데이터셋 제작자 : 김민규(minkyu4506@gmail.com) <br>
+실행코드 제작자 : 김민규(minkyu4506@gmail.com)
 
 YOLOv3 구현코드 출처 : https://github.com/eriklindernoren/PyTorch-YOLOv3
+
+**Note : 실행파일을 만드는 과정에서 생기는 버그로 인해 실행파일을 공유하지 못했습니다. 버그 해결 후 실행파일을 공유하도록 하겠습니다.** <br><br>
+
+### 레포지토리 구성(2022.2.3 기준)
+
+
+<br>
+
+|파일명|설명|
+|---|---|
+|README.md|현재 읽고 계시는 파일입니다. 레포지토리에 대한 설명을 담고 있습니다.|
+|util_codes.py|프로그램 작성 중에 유용했던 메소드들을 정리한 파이썬 파일입니다.|
+
 
 <br>
 
@@ -22,7 +36,7 @@ YOLOv3 구현코드 출처 : https://github.com/eriklindernoren/PyTorch-YOLOv3
 
 <br>
 
-### 개발환경 구성
+### 개발, 실행 환경 구성
 
 ![IMG_0280](https://user-images.githubusercontent.com/50979281/151799427-2e31be67-1df3-43b1-88aa-8b687fce1788.JPG)
 
@@ -45,7 +59,7 @@ labelme를 이용해 모든 이미지에 대한 라벨링을 수행한 뒤, [416
 
 <br>
 
-**[발전 과정]**
+**[발전 과정]** 
 
 데이터셋은 2번의 개선과정을 거쳐 3번째 데이터셋을 최종 데이터셋으로 사용하였습니다. 
 
@@ -92,16 +106,12 @@ labelme를 이용해 모든 이미지에 대한 라벨링을 수행한 뒤, [416
 
 ## 3. 실행방법
 
-**1. 해당 레포지토리를 다운로드 받습니다. (Code -> Download ZIP)**
-   <img width="903" alt="다운로드 방법" src="https://user-images.githubusercontent.com/50979281/151987129-d42eef73-1840-49f2-9989-53fff4cb489a.png">
-**2. 다운로드 받은 zip파일을 압축해제합니다.** <br><br>
-**3. [다운로드 링크](https://drive.google.com/file/d/1e7ddvkeBNNk3MQPlJ10klacODzXNdRC6/view?usp=sharing)에서 가중치 파일을 다운받은 뒤 yolov3 폴더에 넣어줍니다.**
-   <img width="861" alt="가중치 파일 저장" src="https://user-images.githubusercontent.com/50979281/151987811-b98042cc-c1b8-4741-b373-7595d2f43a9e.png">
-**4. yolov3의 상위 폴더에 있는 Ball_detect_program를 실행합니다.**
+<br>
 
+현재 실행파일 생성 과정에서 생기는 버그로 인해 실행파일을 만들지 못했습니다. 
+실행파일읆 만들면 공유하도록 하겠습니다.
 
-**5. 실행 후 키보드 입력을 영어로 전환 후 q를 두 번 누르면 프로그램이 종료됩니다. (두 번 눌렀을 때 종료가 안된다면 여러번 눌러보시길 바랍니다.)** <br><br>
-
+<br><br>
 
 >Note : 프로그램을 실행하려면 PyTorch와 CUDA가 필요하며 **PyTorch 1.9.0과 CUDA 11.2**를 사용하시는걸 권장합니다. <br> 설치방법 참고 : https://medium.com/analytics-vidhya/install-cuda-11-2-cudnn-8-1-0-and-python-3-9-on-rtx3090-for-deep-learning-fcf96c95f7a1
 
@@ -131,6 +141,8 @@ labelme를 이용해 모든 이미지에 대한 라벨링을 수행한 뒤, [416
 
 이를 해결하기 위해 데이터셋의 라벨링 작업을 다시 하거나 데이터셋의 크기를 키우는 방안을 생각중입니다. 
 
+22.02.03 : 공을 라벨링한 bbox의 크기가 공 전체가 아닌 내부만 포함한 경우가 많아 '공의 경계'를 제대로 학습하지 못했다는 사실을 확인했습니다. 그래서 bbox의 크기를 늘렸습니다. 
+<br>그리고 빠르게 움직이는 공에 대해 moving_ball이라고 따로 라벨링을 하였습니다. 
 
 
 
