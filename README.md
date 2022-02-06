@@ -13,7 +13,15 @@ YOLOv3 구현코드 출처 : https://github.com/eriklindernoren/PyTorch-YOLOv3
 |파일명|설명|
 |---|---|
 |README.md|현재 읽고 계시는 파일입니다. 레포지토리에 대한 설명을 담고 있습니다.|
+|update_history.md|프로그램의 개선 과정에서 기록할만한 것들을 따로 기록해놓은 파일입니다.|
+|ball_detect_program.py|메인 파일입니다. 해당 파이썬 파일을 실행하여 당구공 탐지 프로그램을 사용하실 수 있습니다.|
+|codes|프로그램 실행에 필요한 코드들을 모아놓은 폴더입니다.|
+|yolov3|객체 탐지에 사용하는 YOLOv3의 모델을 구성하는데 필요한 파일과 학습시킨 parameter들을 모아놓은 파일을 저장하는 곳입니다.|
 |util_codes.py|프로그램 작성 중에 유용했던 메소드들을 정리한 파이썬 파일입니다.|
+
+<br>
+
+**Note : 프로그램 업데이트에 대한 기록은 [이곳](./update_history.md)에서 확인하실 수 있습니다.**
 
 
 <br>
@@ -124,19 +132,19 @@ labelme를 이용해 모든 이미지에 대한 라벨링을 수행한 뒤, YOLO
 ## 3. 실행방법
 
 **1. 해당 레포지토리를 다운로드 받습니다. (Code -> Download ZIP)**
-   <img width="848" alt="스크린샷 2022-02-06 오전 11 47 35" src="https://user-images.githubusercontent.com/50979281/152665947-2b44fa19-8212-45c7-b36f-bb1d08632ece.png">
+   <img width="800" alt="스크린샷 2022-02-06 오전 11 47 35" src="https://user-images.githubusercontent.com/50979281/152665947-2b44fa19-8212-45c7-b36f-bb1d08632ece.png">
 
 <br><br>
 **2. 다운로드 받은 zip파일을 압축해제합니다.** 
-   <img width="866" alt="스크린샷 2022-02-06 오전 11 53 51" src="https://user-images.githubusercontent.com/50979281/152666050-a14a7d70-834d-4779-8315-f4f06d5e2159.png">
+   <img width="800" alt="스크린샷 2022-02-06 오전 11 53 51" src="https://user-images.githubusercontent.com/50979281/152666050-a14a7d70-834d-4779-8315-f4f06d5e2159.png">
 
 <br><br>
-**3. [다운로드 링크](https://drive.google.com/file/d/1e7ddvkeBNNk3MQPlJ10klacODzXNdRC6/view?usp=sharing)에서 가중치 파일을 다운받은 뒤 yolov3 폴더에 넣어줍니다.**
-   <img width="866" alt="스크린샷 2022-02-06 오전 11 52 07" src="https://user-images.githubusercontent.com/50979281/152665998-e5f8593f-d118-476e-95e4-8ce06816378f.png">
+**3. [다운로드 링크](https://drive.google.com/file/d/1zTg7EjaQl8jDPNKHIN_6mAq70_qWeWBx/view?usp=sharing)에서 가중치 파일을 다운받은 뒤 yolov3 폴더에 넣어줍니다.**
+   <img width="800" alt="스크린샷 2022-02-06 오전 11 52 07" src="https://user-images.githubusercontent.com/50979281/152665998-e5f8593f-d118-476e-95e4-8ce06816378f.png">
 
 <br><br>
 **4. 터미널을 실행 후 cd 명령어를 이용해 레포지토리가 있는 경로로 이동 후 'python ball_detect_program.py'를 입력해 프로그램을 실행합니다.** 
-   <img width="1200" alt="실행 예시" src="https://user-images.githubusercontent.com/50979281/151756165-7be4ad2e-fb25-4c21-9ec9-c003d5c9a49f.png">
+   <img width="800" alt="스크린샷 2022-02-06 오후 12 21 28" src="https://user-images.githubusercontent.com/50979281/152666594-0d4ca5d7-9951-442d-b63d-21ed1658e042.png">
 **5. 실행 후 키보드 입력을 영어로 전환 후 q를 두 번 누르면 프로그램이 종료됩니다. (두 번 눌렀을 때 종료가 안된다면 여러번 눌러보시길 바랍니다.)** <br><br>
 
 
@@ -167,54 +175,3 @@ labelme를 이용해 모든 이미지에 대한 라벨링을 수행한 뒤, YOLO
 <br>
 
 이를 해결하기 위해 데이터셋의 라벨링 작업을 다시 하거나 데이터셋의 크기를 키우는 방안을 생각중입니다. 
-
-<br>
-
-22.02.03 : 공을 라벨링한 bbox의 크기가 공 전체가 아닌 내부만 포함한 경우가 많아 '공의 경계'를 제대로 학습하지 못했다는 사실을 확인했습니다. 그래서 bbox의 크기를 늘렸습니다. 
-<br>그리고 빠르게 움직이는 공에 대해 moving_ball이라고 따로 라벨링을 하였습니다. 
-
-<br>
-
-22.02.04 : bbox의 크기를 일괄적으로 상하좌우 1.5씩 늘리고 학습을 수행한 결과, 노란공이 큐대와 가까운 위치에 있어야 공으로 인식이 된다는 사실을 발견했습니다. <br> 그래서 bbox를 상하좌우 1만큼만 늘리고 공을 표시하는 코드를 수정하기로 했습니다. 2022.02.04 오전 10시 50분부터 수정한 데이터셋으로 학습을 다시 시작했습니다. 
-
-<br>
-
-22.02.05 : 빨간공, 노란공은 잘 탐지되나 흰공이 제대로 인식 안되는 현상을 발견했습니다. <br> 이를 해결하기 위해 흰공의 bbox만 상하좌우로 1픽셀씩 늘려 데이터셋을 재구성 하였습니다. 
-
-<br>
-
-22/02/05 학습 결과(9 classes)
-
-
-|Type|Value|
-|----|-----|
-|IoU loss | 0.01940111815929413  |
-|Object loss | 0.006405044347047806  |
-|Class loss | 0.0534568727016449  |
-|Batch loss | 0.07926303148269653  |
-
-
-|Index|Class|AP|
-|----|-----|-----|
-| 0     | biliard_stick      | 0.05381 |
-| 1     | hand               | 0.40233 |
-| 2     | two_balls          | 0.51695 |
-| 3     | red_ball           | 0.81567 |
-| 4     | white_ball         | 0.58405 |
-| 5     | yellow_ball        | 0.95774 |
-| 6     | moving_red_ball    | 0.47643 |
-| 7     | moving_white_ball  | 0.26847 |
-| 8     | moving_yellow_ball | 0.28966 |
-| 9     | None               | 0.00000 |
-
-
----- mAP 0.43651 ----
-
-
-| Type                 | Value    |
-|----------------------|----------|
-| validation precision | 0.367735 |
-| validation recall    | 0.634910 |
-| validation mAP       | 0.436511 |
-| validation f1        | 0.425193 |
-

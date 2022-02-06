@@ -6,8 +6,8 @@ YOLOv3를 사용하는데 필요한 파일들이 모여있는 폴더입니다.
 
 ## 구성요소
 
-## 1. yolov3-for-Biliard-10Classes.cfg
-[큐대, 손, (공 2개 모인 것), (공 3개 모인 것), 빨간공, 흰공, 노란공, (움직이는 빨간공, 흰공, 노란공)]을 구분하는 YOLOv3의 구조가 저장된 파일입니다. 
+## 1. yolov3-for-Biliard-9Classes.cfg
+[큐대, 손, (공 2개 모인 것), 빨간공, 흰공, 노란공, (움직이는 빨간공, 흰공, 노란공)]을 구분하는 YOLOv3의 구조가 저장된 파일입니다. 
 <br>
 파일의 구조는 다음과 같습니다.
 
@@ -20,16 +20,16 @@ Training은 학습에 필요한 Hyperparameter들의 값이고 Layers는 YOLOv3�
 
 <br>
 
-## 2. yolov3_weights_10Classes.pth
+## 2. yolov3_weights_9Classes.pth
 학습시킨 YOLOv3의 가중치들을 저장한 파일입니다. 다음과 같이 load_state_dict()를 이용해 학습된 가중치를 YOLOv3에다 불러올 수 있습니다.
 
 ~~~python
-model.load_state_dict(torch.load('yolov3_weights_10Classes.pth', map_location='cuda'))
+model.load_state_dict(torch.load('yolov3_weights_9Classes.pth', map_location='cuda'))
 ~~~
 
 <br>
 
-만약 파일이 없으면 [링크](https://drive.google.com/file/d/1e7ddvkeBNNk3MQPlJ10klacODzXNdRC6/view?usp=sharing)에서 파일을 다운로드 받은 후 본 README가 있는 yolov3 폴더에 놔두시면 됩니다.
+만약 파일이 없으면 [링크](https://drive.google.com/file/d/1zTg7EjaQl8jDPNKHIN_6mAq70_qWeWBx/view?usp=sharing)에서 파일을 다운로드 받은 후 본 README가 있는 yolov3 폴더에 놔두시면 됩니다.
 
 
 
