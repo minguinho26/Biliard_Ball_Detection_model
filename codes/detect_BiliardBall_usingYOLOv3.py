@@ -134,16 +134,16 @@ def detect_biliard_ball(model, image, device, window_name, img_size = 416, nms_t
     detections = [white_ball, yellow_ball, red_ball] # ball 객체들로 구성된 리스트 생성
 
     for detect_bbox in detections :
-        # 공의 종류에 맞는 색을 가진 bbox를 출력 
-        if detect_bbox[4] == RED_BALL_INDEX or detect_bbox[4] == MOVING_RED_BALL_INDEX : # 빨간공
-            if detect_bbox.isValid() == True : # Ball이 가지고 있는 값들이 모두 0.0이 아니면 공의 좌표를 출력. 앞서 공을 탐지 못했을시 모든 값을 0.0으로 설정한 이유
+
+        # Ball이 가지고 있는 값들이 모두 0.0이 아니면 공의 좌표를 출력. 앞서 공을 탐지 못했을시 모든 값을 0.0으로 설정한 이유
+        if not (detect_bbox[0] == 0 & detect_bbox[1] & detect_bbox[2] == 0 & detect_bbox[3] == 0) : 
+            # 공의 종류에 맞는 색을 가진 bbox를 출력 
+            if detect_bbox[4] == RED_BALL_INDEX or detect_bbox[4] == MOVING_RED_BALL_INDEX : # 빨간공
                 cv2.rectangle(image, (detect_bbox[0], detect_bbox[1]), (detect_bbox[2], detect_bbox[3]), red_color, 2)
-        elif detect_bbox[4] == WHITE_BALL_INDEX or detect_bbox[4] == MOVING_WHITE_BALL_INDEX : # 흰공
-            if detect_bbox.isValid() == True :
+            elif detect_bbox[4] == WHITE_BALL_INDEX or detect_bbox[4] == MOVING_WHITE_BALL_INDEX : # 흰공
                 cv2.rectangle(image, (detect_bbox[0], detect_bbox[1]), (detect_bbox[2], detect_bbox[3]), white_color, 2)
-        elif detect_bbox[4] == YELLOW_BALL_INDEX or detect_bbox[4] == MOVING_YELLOW_BALL_INDEX : # 노란공
-            if detect_bbox.isValid() == True :
+            elif detect_bbox[4] == YELLOW_BALL_INDEX or detect_bbox[4] == MOVING_YELLOW_BALL_INDEX : # 노란공
                 cv2.rectangle(image, (detect_bbox[0], detect_bbox[1]), (detect_bbox[2], detect_bbox[3]), yellow_color, 2)
-        
+            
     cv2.imshow(window_name, image[:, :, [2, 1, 0]]) # RGB -> BGR변환. opencv는 BGR을 사용한다
     cv2.waitKey(1)
