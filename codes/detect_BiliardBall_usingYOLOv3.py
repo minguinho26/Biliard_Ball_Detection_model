@@ -6,6 +6,7 @@ from __future__ import division
 
 import numpy as np
 import cv2
+import timeit
 
 import torch
 import torchvision.transforms as transforms
@@ -69,7 +70,8 @@ red_color = (255, 0, 0)
 # ====================================
 
 def detect_biliard_ball(model, image, device, window_name, img_size = 416, nms_thres = 0.1) : # 입력받은 프레임을 가지고 공 탐지
-
+    time_start = timeit.default_timer() # start time
+    
     # 입력받은 프레임을 전처리
     input_img = transforms.Compose([
         DEFAULT_TRANSFORMS,
@@ -161,6 +163,10 @@ def detect_biliard_ball(model, image, device, window_name, img_size = 416, nms_t
         elif detect_bbox.color_idx == YELLOW_BALL_INDEX or detect_bbox.color_idx == MOVING_YELLOW_BALL_INDEX : # 노란공
             if detect_bbox.isValid() == True :
                 cv2.rectangle(image, (detect_bbox.min_x, detect_bbox.min_y), (detect_bbox.max_x, detect_bbox.max_y), yellow_color, 2)
-        
+                
+    time_end = timeit.default_timer() # end time
+    FPS = int(1./(time_end - time_start )) # 공 탐지 시작 전 시간과 탐지 후 시간의 차이를 이용해 FPS를 계산한다
+    cv2.putText(image,"FPS : " + str(FPS), (1090, 43), cv2.FONT_HERSHEY_SIMPLEX, 1,(255,0,0),2) # 계산한 FPS를 화면에 출력
+    
     cv2.imshow(window_name, image[:, :, [2, 1, 0]]) # RGB -> BGR변환. opencv는 BGR을 사용한다
     cv2.waitKey(1)
