@@ -24,6 +24,10 @@ def main() :
 
     capture = cv2.VideoCapture(0) # 연결된 카메라 혹은 비디오에서 프레임을 얻기 위해 필요한 객체. 0을 매개변수로 전달하면 연결된 카메라에서 프레임을 얻어온다
 
+    # 캡처하는 프레임의 해상도 조정
+    capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
     # 카메라로 프레임을 캡처하지 못했으면 프로그램 종료
     if not capture.isOpened():
         print("Could not open webcam")
