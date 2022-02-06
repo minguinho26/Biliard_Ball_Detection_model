@@ -4,9 +4,6 @@
 # 제작자 : 김민규
 from __future__ import division
 
-import sys
-sys.path.append('/home/minkyukim/pretrained_models/YOLOv3')
-
 import numpy as np
 import cv2
 
@@ -14,7 +11,33 @@ import torch
 import torchvision.transforms as transforms
 
 from codes.YOLOv3_utils import *
-from ball_detect_program import *
+
+# 공의 위치를 나타낼 때 사용하는 클래스
+# 당구대에 공이 탐지되지 않을 경우 모든 값을 0.0으로 설정해 화면에 나타낼 수 없게 만들기 위해 제작
+# YOLOv3에서 얻은 공의 bbox를 사용할 수 있게 처리 후 BALL에 저장한다
+class BALL :
+    def __init__(self) :
+        # opencv에서 이미지에 도형 그릴 때 필요한 값들
+        self.min_x = 0
+        self.min_y = 0
+        self.max_x = 0
+        self.max_y = 0
+
+        # 색깔의 index. YOLOv3의 출력값에 있다.
+        self.color_idx = 0
+        
+    # bbox를 BALL에 저장하는 메소드
+    def set_coordi(self, coordi) :
+        coordi = coordi.astype(np.int32)
+
+        self.min_x = coordi[0]
+        self.min_y = coordi[1]
+        self.max_x = coordi[2]
+        self.max_y = coordi[3]
+        self.color_idx = coordi[5]
+
+    def isValid(self) : 
+        return not (self.min_x == 0 & self.min_y == 0 & self.max_x == 0 & self.max_y == 0)
 
 # ====================================
 # 전역변수 선언, 정의 =====================
@@ -45,18 +68,6 @@ red_color = (255, 0, 0)
 # 전역변수 선언, 정의 =====================
 # ====================================
 
-# ball, moving_ball 중 사용할 좌표를 따로 저장할 때 사용
-def set_coordi(ball_coordi) :
-    temp_coordi = []
-
-    temp_coordi.append(int(ball_coordi[0])) # x_min
-    temp_coordi.append(int(ball_coordi[1])) # y_min
-    temp_coordi.append(int(ball_coordi[2])) # x_max
-    temp_coordi.append(int(ball_coordi[3])) # y_max
-    temp_coordi.append(int(ball_coordi[5])) # class idx
-
-    return temp_coordi
-
 def detect_biliard_ball(model, image, device, window_name, img_size = 416, nms_thres = 0.1) : # 입력받은 프레임을 가지고 공 탐지
 
     # 입력받은 프레임을 전처리
@@ -83,6 +94,12 @@ def detect_biliard_ball(model, image, device, window_name, img_size = 416, nms_t
 
     # 따로 모은 것들에서 가장 confience가 높은 것을 하나씩 뽑음
     # 여기서 얻은 ball_coordi들을 YOLOv3가 탐지한 공들의 좌표로 사용한다
+    
+    # 공의 위치정보를 담을 BALL 클래스의 객체들을 정의
+    white_ball = BALL()
+    yellow_ball = BALL()
+    red_ball = BALL()
+    
     if red_ball_coordi_group.size()[0] > 0 :
         red_ball_coordi = red_ball_coordi_group[red_ball_coordi_group[:,4].argmax(),:].numpy()
     else :
@@ -114,36 +131,36 @@ def detect_biliard_ball(model, image, device, window_name, img_size = 416, nms_t
     else :
         moving_yellow_ball_coordi = np.asarray([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
-
+    
     # confidence score보고 moving ball과 ball중 하나를 공의 좌표로 선정
     if moving_red_ball_coordi[4] > red_ball_coordi[4] :
-        red_ball = set_coordi(moving_red_ball_coordi)
+        red_ball.set_coordi(moving_red_ball_coordi)
     else :
-        red_ball = set_coordi(red_ball_coordi)
+        red_ball.set_coordi(red_ball_coordi)
 
     if moving_white_ball_coordi[4] > white_ball_coordi[4] :
-        white_ball = set_coordi(moving_white_ball_coordi)
+        white_ball.set_coordi(moving_white_ball_coordi)
     else :
-        white_ball = set_coordi(white_ball_coordi)
+        white_ball.set_coordi(white_ball_coordi)
 
     if moving_yellow_ball_coordi[4] > yellow_ball_coordi[4] :
-        yellow_ball = set_coordi(moving_yellow_ball_coordi)
+        yellow_ball.set_coordi(moving_yellow_ball_coordi)
     else :
-        yellow_ball = set_coordi(yellow_ball_coordi)
+        yellow_ball.set_coordi(yellow_ball_coordi)
 
     detections = [white_ball, yellow_ball, red_ball] # ball 객체들로 구성된 리스트 생성
 
     for detect_bbox in detections :
-
-        # Ball이 가지고 있는 값들이 모두 0.0이 아니면 공의 좌표를 출력. 앞서 공을 탐지 못했을시 모든 값을 0.0으로 설정한 이유
-        if not (detect_bbox[0] == 0 & detect_bbox[1] & detect_bbox[2] == 0 & detect_bbox[3] == 0) : 
-            # 공의 종류에 맞는 색을 가진 bbox를 출력 
-            if detect_bbox[4] == RED_BALL_INDEX or detect_bbox[4] == MOVING_RED_BALL_INDEX : # 빨간공
-                cv2.rectangle(image, (detect_bbox[0], detect_bbox[1]), (detect_bbox[2], detect_bbox[3]), red_color, 2)
-            elif detect_bbox[4] == WHITE_BALL_INDEX or detect_bbox[4] == MOVING_WHITE_BALL_INDEX : # 흰공
-                cv2.rectangle(image, (detect_bbox[0], detect_bbox[1]), (detect_bbox[2], detect_bbox[3]), white_color, 2)
-            elif detect_bbox[4] == YELLOW_BALL_INDEX or detect_bbox[4] == MOVING_YELLOW_BALL_INDEX : # 노란공
-                cv2.rectangle(image, (detect_bbox[0], detect_bbox[1]), (detect_bbox[2], detect_bbox[3]), yellow_color, 2)
-            
+        # 공의 종류에 맞는 색을 가진 bbox를 출력 
+        if detect_bbox.color_idx == RED_BALL_INDEX or detect_bbox.color_idx == MOVING_RED_BALL_INDEX : # 빨간공
+            if detect_bbox.isValid() == True : # Ball이 가지고 있는 값들이 모두 0.0이 아니면 공의 좌표를 출력. 앞서 공을 탐지 못했을시 모든 값을 0.0으로 설정한 이유
+                cv2.rectangle(image, (detect_bbox.min_x, detect_bbox.min_y), (detect_bbox.max_x, detect_bbox.max_y), red_color, 2)
+        elif detect_bbox.color_idx == WHITE_BALL_INDEX or detect_bbox.color_idx == MOVING_WHITE_BALL_INDEX : # 흰공
+            if detect_bbox.isValid() == True :
+                cv2.rectangle(image, (detect_bbox.min_x, detect_bbox.min_y), (detect_bbox.max_x, detect_bbox.max_y), white_color, 2)
+        elif detect_bbox.color_idx == YELLOW_BALL_INDEX or detect_bbox.color_idx == MOVING_YELLOW_BALL_INDEX : # 노란공
+            if detect_bbox.isValid() == True :
+                cv2.rectangle(image, (detect_bbox.min_x, detect_bbox.min_y), (detect_bbox.max_x, detect_bbox.max_y), yellow_color, 2)
+        
     cv2.imshow(window_name, image[:, :, [2, 1, 0]]) # RGB -> BGR변환. opencv는 BGR을 사용한다
     cv2.waitKey(1)
