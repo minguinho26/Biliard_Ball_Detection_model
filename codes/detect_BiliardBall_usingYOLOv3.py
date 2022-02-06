@@ -49,11 +49,11 @@ red_color = (255, 0, 0)
 def set_coordi(ball_coordi) :
     temp_coordi = []
 
-    temp_coordi.append(ball_coordi[0]) # x_min
-    temp_coordi.append(ball_coordi[1]) # y_min
-    temp_coordi.append(ball_coordi[2]) # x_max
-    temp_coordi.append(ball_coordi[3]) # y_max
-    temp_coordi.append(ball_coordi[5]) # class idx
+    temp_coordi.append(int(ball_coordi[0])) # x_min
+    temp_coordi.append(int(ball_coordi[1])) # y_min
+    temp_coordi.append(int(ball_coordi[2])) # x_max
+    temp_coordi.append(int(ball_coordi[3])) # y_max
+    temp_coordi.append(int(ball_coordi[5])) # class idx
 
     return temp_coordi
 
