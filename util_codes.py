@@ -4,7 +4,7 @@
 # 제작일 : 2021.2.3
 
 # labelme로 만든 라벨 데이터를 프로그램에 사용한 YOLOv3의 라벨 데이터 양식으로 변환시키는 메소드
-# 매개변수 : dataset_root_folder_path(데이터셋의 경로)
+# 매개변수 : dataset_root_folder_path(데이터셋의 경로), ori_img_size(원래 이미지 크기를 저장한 리스트. 만약 원래 이미지가 1280 x 720이면 [1280, 720]이 ori_img_size가 됩니다.)
 # ==============================데이터셋 구조============================== 
 # dataset_root_folder
 # ┗images(YOLOv3가 사용할 이미지들이 들어있는 폴더. 빈폴더여야 합니다.)
@@ -45,6 +45,8 @@ def convert_labelmeAugFile_to_YOLOv3_AugFile(dataset_root_folder_path) :
         
         # ====================================이미지 사이즈를 416 x 416으로 변형 후 저장====================================
         img = Image.open(ori_image_folder + '/' + ori_annotation_list[i][:-5] + ".jpg").convert('RGB')
+        img_size = img.size # 이미지의 원래 크기. bbox 변형에 사용합니다.
+
         img_resize = img.resize((416, 416))
         img_resize.save(new_image_folder + '/' + ori_annotation_list[i][:-5] + ".jpg")
         # ====================================이미지 사이즈를 416 x 416으로 변형 후 저장====================================
@@ -61,11 +63,11 @@ def convert_labelmeAugFile_to_YOLOv3_AugFile(dataset_root_folder_path) :
         for annotation in json_data['shapes'] :
             label_idx = name_classes.index(annotation['label'])
                     
-            x1 = annotation['points'][0][0] * (416.0/640.0)
-            y1 = annotation['points'][0][1] * (416.0/360.0)
+            x1 = annotation['points'][0][0] * (416.0/float(img_size[0]))
+            y1 = annotation['points'][0][1] * (416.0/float(img_size[1]))
 
-            x2 = annotation['points'][1][0] * (416.0/640.0)
-            y2 = annotation['points'][1][1] * (416.0/360.0)
+            x2 = annotation['points'][1][0] * (416.0/float(img_size[0]))
+            y2 = annotation['points'][1][1] * (416.0/float(img_size[1]))
 
             x_center = ((x1 + x2) / 2) / 416.0
             y_center = ((y1 + y2) / 2) / 416.0
