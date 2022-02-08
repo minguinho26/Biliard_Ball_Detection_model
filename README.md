@@ -159,7 +159,7 @@ labelme를 이용해 모든 이미지에 대한 라벨링을 수행한 뒤, YOLO
 
 결과 1             |  결과 2
 :-------------------------:|:-------------------------:
-<img width="600" alt="스크린샷 2022-01-30 오전 1 02 44" src="https://user-images.githubusercontent.com/50979281/151748223-96fdd8ff-80c2-4035-bfcd-23a3f1970d26.jpg"> |  <img width="600" alt="스크린샷 2022-01-30 오전 1 02 44" src="https://user-images.githubusercontent.com/50979281/151748239-414f3867-c2fb-4017-a956-02cd6e9b7c94.jpg">
+<img width="600" alt="스크린샷 2022-01-30 오전 1 02 44" src="https://user-images.githubusercontent.com/50979281/153019860-58feb3fa-b74a-40b3-afd8-10de5dd5cc5b.jpg"> |  <img width="600" alt="스크린샷 2022-01-30 오전 1 02 44" src="https://user-images.githubusercontent.com/50979281/153020323-3fa208d2-66ba-4af1-bc6e-9b65db3a3b2c.jpg">
 
 
 당구대에 흰공이 없거나 흰공의 confidence가 매우 낮아 nms를 통과하지 못하는 경우가 아니면 손과 당구대를 공으로 인식하는 일이 없었습니다. 
@@ -169,9 +169,9 @@ labelme를 이용해 모든 이미지에 대한 라벨링을 수행한 뒤, YOLO
 ## 5. 개선해야될 부분
 두 공이 붙어있을 경우에 대해 학습했으나 두 공이 붙어있어도 한 공으로 인식하는 경우가 계속 발생했습니다. <br>
 
-두 공이 곂쳐서 하나의 공으로 인식됨             |  흰공이 인식 안됨 + 곂친 공들을 하나의 공으로 인식
+두 공이 곂쳤는데 하나의 공만 인식됨             |  두 공이 하나의 곧으로 인식됨
 :-------------------------:|:-------------------------:
-<img width="600" alt="스크린샷 2022-01-30 오전 1 02 44" src="https://user-images.githubusercontent.com/50979281/151749899-c323de34-7a0a-4f8c-91cb-24b0f7853ca8.jpg"> |  <img width="600" alt="스크린샷 2022-01-30 오전 1 02 44" src="https://user-images.githubusercontent.com/50979281/151749909-fd4fec2c-4566-44c7-8045-ca232aad3fcd.jpg">
+<img width="600" alt="스크린샷 2022-01-30 오전 1 02 44" src="https://user-images.githubusercontent.com/50979281/153020343-13e598d5-155d-4506-8734-1ed505dbed2c.jpg"> |  <img width="600" alt="스크린샷 2022-01-30 오전 1 02 44" src="https://user-images.githubusercontent.com/50979281/153021028-bc8b515d-1a4c-456a-ac92-46eeaeff1fe7.jpg">
 
 <br>
 

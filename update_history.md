@@ -208,3 +208,75 @@
 | validation f1        | 0.557080 |
 
 Note : mAP가 비슷한 것은 None의 AP를 계산 대상에서 제외했기 때문입니다. 객체별 정확도를 비교하시면 됩니다. 
+
+학습 후 측정된 성능 
+
+
+| Type        | Value                |
+|-------------|----------------------|
+| IoU loss    | 0.051199983805418015 |
+| Object loss | 0.021511608734726906 |
+| Class loss  | 0.09351477771997452  |
+| Batch loss  | 0.1662263721227646   |
+
+
+
+| Index | Class              | AP      |
+|-------|--------------------|---------|
+| 0     | biliard_stick      | 0.03810 |
+| 1     | hand               | 0.43476 |
+| 2     | two_balls          | 0.45751 |
+| 3     | red_ball           | 0.96403 |
+| 4     | white_ball         | 1.00225 |
+| 5     | yellow_ball        | 0.95251 |
+| 6     | moving_red_ball    | 0.45313 |
+| 7     | moving_white_ball  | 0.55332 |
+| 8     | moving_yellow_ball | 0.44562 |
+
+---- mAP 0.58903 ----
+
+| Type                 | Value    |
+|----------------------|----------|
+| validation precision | 0.530989 |
+| validation recall    | 0.712010 |
+| validation mAP       | 0.589028 |
+| validation f1        | 0.596022 |
+|----------------------|----------|
+
+**22.02.08**  : class에 관한 loss를 계산할 때 two_balls, three_balls가 있는 이미지를 가지고 계산한 loss를 키웠습니다. 현재 사용중인 YOLOv3은 배치 단위로 target을 받고 YOLOv3가 3종류의 scale에서 출력한 bbox들을 가지고 Loss를 계산하는데 해당 bbox들이 two_balls, three_balls를 예측한 경우가 많아질 수록 해당 배치의 loss크기가 커지는 것입니다. 코드로 설명하면 다음과 같습니다.
+
+~~~python
+num_multiballs_data_ratio = (t[t[:,2] == 1].size()[0]) / t.size()[0] 
+lcls += BCEcls(ps[:, 5:], t) * (1.0 + num_multiballs_data_ratio)
+~~~
+
+그리고 데이터 라벨링을 추가로 수행하여 총 3612개의 데이터가 들어있는 데이터셋이 되었으며 공 3개가 모이는 경우가 상닫히 많아 'three_balls'도 탐지 대상으로 다시 추가 후 학습을 진행하였습니다. epoch 62에서 측정된 성능은 다음과 같습니다. 
+
+| Type        | Value                |
+|-------------|----------------------|
+| IoU loss    | 0.06044703722000122  |
+| Object loss | 0.016991425305604935 |
+| Class loss  | 0.08713984489440918  |
+| Batch loss  | 0.16457830369472504  |
+
+
+| Index | Class             | AP      |
+|-------|-------------------|---------|
+| 0     | biliard_stick     | 0.06135 |
+| 1     | hand              | 0.49103 |
+| 2     | two_balls         | 0.41777 |
+| 3     | three_balls       | 0.00263 |
+| 4     | red_ball          | 0.93774 |
+| 5     | white_ball        | 0.98861 |
+| 6     | yellow_ball       | 0.93674 |
+| 7     | moving_red_ball   | 0.15483 |
+| 8     | moving_white_ball | 0.37495 |
+
+---- mAP 0.48507 ----
+
+| Type                 | Value    |
+|----------------------|----------|
+| validation precision | 0.532793 |
+| validation recall    | 0.569365 |
+| validation mAP       | 0.485072 |
+| validation f1        | 0.502961 |
