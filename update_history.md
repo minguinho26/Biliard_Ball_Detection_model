@@ -243,40 +243,66 @@ Note : mAP가 비슷한 것은 None의 AP를 계산 대상에서 제외했기 �
 | validation f1        | 0.596022 |
 |----------------------|----------|
 
-**22.02.08**  : class에 관한 loss를 계산할 때 two_balls, three_balls가 있는 이미지를 가지고 계산한 loss를 키웠습니다. 현재 사용중인 YOLOv3은 배치 단위로 target을 받고 YOLOv3가 3종류의 scale에서 출력한 bbox들을 가지고 Loss를 계산하는데 해당 bbox들이 two_balls, three_balls를 예측한 경우가 많아질 수록 해당 배치의 loss크기가 커지는 것입니다. 코드로 설명하면 다음과 같습니다.
+**22.02.08**  : class에 관한 loss를 계산할 때 two_balls, three_balls가 있는 이미지를 가지고 계산한 loss를 키웠습니다. 현재 사용중인 YOLOv3은 배치 단위로 target을 받고 YOLOv3가 3종류의 scale에서 출력한 bbox들을 가지고 Loss를 계산하는데 해당 bbox들이 two_balls, three_balls를 예측한 경우가 많아질 수록 해당 배치의 loss크기가 커지는 것입니다. 현재 2가지 방식을 생각했으며 코드로 설명하면 다음과 같습니다.
 
 ~~~python
-num_multiballs_data_ratio = (t[t[:,2] == 1].size()[0]) / t.size()[0] 
-lcls += BCEcls(ps[:, 5:], t) * (1.0 + num_multiballs_data_ratio)
+# Hot one class encoding
+t = torch.zeros_like(ps[:, 5:], device=device) # targets 
+t[range(num_targets), tcls[layer_index]] = 1
+                
+
+# 방식 1 : 배치 단위로 받을 때 배치에 two_balls, three_balls가 들어있는 데이터 비율을 loss계산에 반영
+multi_ball_ratio = t[t[:,2] == 1].size()[0] / t.size()[0]
+lcls += BCEcls(ps[:, 5:], t) + 0.01 * multi_ball_ratio * lcls += BCEcls(ps[:, 5:], t) 
+
+
+# 방식 2 : two_balls, three_balls가 있는 데이터에 관한 loss를 구한 뒤 loss계산에 추가로 반영
+idx_multiballs = t[:,2].nonzero(as_tuple=True)[0]
+t_multi_balls = t[idx_multiballs,:]
+ps_multi_balls = ps[idx_multiballs,5:]
+                
+              
+# Use the tensor to calculate the BCE loss
+lcls += BCEcls(ps[:, 5:], t) # 기존의 loss
+if ps_multi_balls.size()[0] > 0 and t_multi_balls.size()[0] : # two_balls, three_balls가 있는 데이터가 있으면 loss에 더함
+    lcls += 0.1 * BCEcls(ps_multi_balls, t_multi_balls)
 ~~~
 
-그리고 데이터 라벨링을 추가로 수행하여 총 3612개의 데이터가 들어있는 데이터셋이 되었으며 공 3개가 모이는 경우가 상닫히 많아 'three_balls'도 탐지 대상으로 다시 추가 후 학습을 진행하였습니다. epoch 62에서 측정된 성능은 다음과 같습니다. 
+그리고 데이터 라벨링을 추가로 수행하여 총 3612개의 데이터가 들어있는 데이터셋이 되었으며 공 3개가 모이는 경우가 상닫히 많아 'three_balls'도 탐지 대상으로 다시 추가 후 학습을 진행하였습니다. 측정된 성능은 다음과 같습니다. 
 
-| Type        | Value                |
-|-------------|----------------------|
-| IoU loss    | 0.06044703722000122  |
-| Object loss | 0.016991425305604935 |
-| Class loss  | 0.08713984489440918  |
-| Batch loss  | 0.16457830369472504  |
+<br>
+
+1. 방식 1로 구한 loss로 학습시킬 경우
+
+    | Type        | Value                |
+    |-------------|----------------------|
+    | IoU loss    | 0.05494890734553337  |
+    | Object loss | 0.013550731353461742 |
+    | Class loss  | 0.14103847742080688  |
+    | Batch loss  | 0.20953811705112457  |
 
 
-| Index | Class             | AP      |
-|-------|-------------------|---------|
-| 0     | biliard_stick     | 0.06135 |
-| 1     | hand              | 0.49103 |
-| 2     | two_balls         | 0.41777 |
-| 3     | three_balls       | 0.00263 |
-| 4     | red_ball          | 0.93774 |
-| 5     | white_ball        | 0.98861 |
-| 6     | yellow_ball       | 0.93674 |
-| 7     | moving_red_ball   | 0.15483 |
-| 8     | moving_white_ball | 0.37495 |
+    | Index | Class             | AP      |
+    |-------|-------------------|---------|
+    | 0     | biliard_stick     | 0.00518 |
+    | 1     | hand              | 0.53844 |
+    | 2     | two_balls         | 0.45526 |
+    | 3     | three_balls       | 0.00306 |
+    | 4     | red_ball          | 0.99263 |
+    | 5     | white_ball        | 1.03725 |
+    | 6     | yellow_ball       | 0.86106 |
+    | 7     | moving_red_ball   | 0.49443 |
+    | 8     | moving_white_ball | 0.39112 |
 
----- mAP 0.48507 ----
+    ---- mAP 0.53094 ----
 
-| Type                 | Value    |
-|----------------------|----------|
-| validation precision | 0.532793 |
-| validation recall    | 0.569365 |
-| validation mAP       | 0.485072 |
-| validation f1        | 0.502961 |
+    | Type                 | Value    |
+    |----------------------|----------|
+    | validation precision | 0.501264 |
+    | validation recall    | 0.617272 |
+    | validation mAP       | 0.530936 |
+    | validation f1        | 0.541564 |
+
+<br>
+
+2. 방식 2로 구한 loss로 학습시켰을 경우(학습 중)
