@@ -305,4 +305,19 @@ if ps_multi_balls.size()[0] > 0 and t_multi_balls.size()[0] : # two_balls, three
 
 <br>
 
-2. 방식 2로 구한 loss로 학습시켰을 경우(학습 중)
+2. 방식 2로 구한 loss로 학습시켰을 경우
+
+    | Index | Class              | AP      |
+    |-------|--------------------|---------|
+    | 0     | biliard_stick      | 0.07806 |
+    | 1     | hand               | 0.47209 |
+    | 2     | two_balls          | 0.52810 |
+    | 3     | three_balls        | 0.08252 |
+    | 4     | red_ball           | 0.97154 |
+    | 5     | white_ball         | 0.35246 |
+    | 6     | yellow_ball        | 1.28533 |
+    | 7     | moving_red_ball    | 0.42368 |
+    | 8     | moving_white_ball  | 0.28361 |
+    | 9     | moving_yellow_ball | 0.33500 |
+
+    (다른 측정표도 가져오려고 했으나 해당 결과가 출력된 jupyter notebook block을 지워버리는 바람에 가져오지 못했습니다.)
