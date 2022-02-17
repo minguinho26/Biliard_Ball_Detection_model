@@ -63,6 +63,7 @@ def get_distance(ball1, ball2) :
     return np.sqrt(diff_x * diff_x + diff_y * diff_y)
 
 # 내가 친 공이 나머지 두 공을 맞췄는지 판정하는 함수
+# ball_crush_stack[target_color_idx]가 1이면 내가 친 공이 공 하나를 맞춘거고 2면 내가 친 공이 공 두개를 맞춘 상황 == 득점
 def determine_crush_stack(ball_crush_stack, FirstMovingBall_COLOR, BALLS, now) :
     target_color_idx = FirstMovingBall_COLOR# crush_stack을 올릴 공의 index
     is_Stack_value = 0
