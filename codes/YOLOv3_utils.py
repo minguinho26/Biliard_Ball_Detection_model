@@ -66,17 +66,13 @@ def rescale_boxes(boxes, current_dim, original_shape): # current_dim은 YOLOv3�
 # pytorchyolo/utils/utils.py의 non_max_suppression를 수정한 메소드
 # YOLOv3에서 얻은 bbox는 [x_center, y_center, width, height, confidence, cls_preds]로 구성된다.
 # 이를 사용하기 편하게 [x_center, y_center, width, height, confidence, 탐지한 객체의 index]로 바꿔주며 바꾸는 과정에서 NMS를 수행해 iou가 일정수치 이상인 bbox만 이용한다
-def change_bbox_to_use(prediction, iou_thres): # prediction : [16, 10647, 8]
+def change_bbox_to_use(prediction, conf_thres=0.0): # prediction : [16, 10647, 8]
     # Settings
-    # (pixels) minimum and maximum box width and height
-    max_wh = 4096
-    max_det = 300  # maximum number of detections per image
-    max_nms = 30000  # maximum number of boxes into torchvision.ops.nms()
-    
-    t = time.time()
-    output = [torch.zeros((0, 6), device="cpu")] * prediction.shape[0] # [-1, 6]인 리스트. -
+    max_nms = 2000  # maximum number of boxes into torchvision.ops.nms()
 
-    for xi, x in enumerate(prediction):  
+    for _, x in enumerate(prediction):  
+        
+        x = x[x[:, 4] > conf_thres]  # confidence
         
         # Compute conf
         x[:, 5:] *= x[:, 4:5]  # conf = obj_conf * cls_conf
@@ -85,7 +81,7 @@ def change_bbox_to_use(prediction, iou_thres): # prediction : [16, 10647, 8]
         box = xywh2xyxy(x[:, :4])
 
         # Detections matrix nx6 (xyxy, conf, cls)
-        i, j = (x[:, 5:] >= 0.05).nonzero(as_tuple=False).T
+        i, j = (x[:, 5:] >= conf_thres).nonzero(as_tuple=False).T
         x = torch.cat( (box[i], x[i, j + 5, None], j[:, None].float()), 1)
 
         # Check shape
@@ -95,18 +91,7 @@ def change_bbox_to_use(prediction, iou_thres): # prediction : [16, 10647, 8]
         elif n > max_nms:  # excess boxes
             # sort by confidence
             x = x[x[:, 4].argsort(descending=True)[:max_nms]]
-            
-        # Batched NMS
-        c = x[:, 5:6] * max_wh  # classes
-        # boxes (offset by class), scores
-        boxes, scores = x[:, :4] + c, x[:, 4]
-        i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS. iou가 iou_thres를 넘기는 bbox만 사용
-        if i.shape[0] > max_det:  # limit detections
-            i = i[:max_det]
-            
-        output[xi] = to_cpu(x[i])
-    
-    return output
+    return x
 # ====================================================================
 # pytorchyolo/utils/utils.py에 있던 메소드들 =============================
 # ====================================================================

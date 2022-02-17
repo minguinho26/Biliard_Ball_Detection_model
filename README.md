@@ -95,36 +95,36 @@ labelme를 이용해 모든 이미지에 대한 라벨링을 수행한 뒤, YOLO
 ### 학습 후 성능
 <br>
 
-검증 데이터셋을 이용해 측정한 모델의 성능은 다음과 같습니다. (mAP = 0.54722, 2021.02.06 기준)
+검증 데이터셋을 이용해 측정한 모델의 성능은 다음과 같습니다. (mAP = 0.68002, 2021.02.17 기준)
 
 | Type        | Value                |
 |-------------|----------------------|
-| IoU loss    | 0.05444442108273506  |
-| Object loss | 0.010509137064218521 |
-| Class loss  | 0.0764257088303566   |
-| Batch loss  | 0.14137926697731018  |
+| IoU loss    | 0.13242006301879883  |
+| Object loss | 0.030031338334083557 |
+| Class loss  | 0.3855709731578827   |
+| Batch loss  | 0.5480223894119263   |
 
 
 | Index | Class              | AP      |
 |-------|--------------------|---------|
-| 0     | biliard_stick      | 0.01337 |
-| 1     | hand               | 0.53345 |
-| 2     | two_balls          | 0.57100 |
-| 3     | red_ball           | 0.97780 |
-| 4     | white_ball         | 0.98380 |
-| 5     | yellow_ball        | 0.97419 |
-| 6     | moving_red_ball    | 0.51518 |
-| 7     | moving_white_ball  | 0.41327 |
-| 8     | moving_yellow_ball | 0.49014 |
-| 9     | None               | 0.00000 |
+| 0     | biliard_stick      | 0.36440 |
+| 1     | hand               | 0.71033 |
+| 2     | two_balls          | 0.47845 |
+| 3     | three_balls        | 0.55114 |
+| 4     | red_ball           | 0.97533 |
+| 5     | white_ball         | 0.97828 |
+| 6     | yellow_ball        | 0.97254 |
+| 7     | moving_red_ball    | 0.56465 |
+| 8     | moving_white_ball  | 0.52504 |
+| 9     | moving_yellow_ball | 0.65193 |
 
 
 | Type                 | Value    |
 |----------------------|----------|
-| validation precision | 0.465478 |
-| validation recall    | 0.697178 |
-| validation mAP       | 0.547221 |
-| validation f1        | 0.508614 |
+| validation precision | 0.582968 |
+| validation recall    | 0.790646 |
+| validation mAP       | 0.680018 |
+| validation f1        | 0.661801 |
 
 
 

@@ -9,20 +9,23 @@ import numpy as np
 import os
 import cv2
 
-# NOTHING : 아직 상태가 안정해짐 or 현재 프레임에서 공을 탐지하지 못함, WAITING : 가만히 있는 상태
-# MOVING : 공이 움직이는 상태, CLASHING : 공이 어딘가에 충돌한 상태(속도가 바뀜)
-STATUS = {'NOTHING' : 0, 'WAITING' : 1, 'MOVING' : 2, 'CLASHING' : 3}
+# 이미지 저장에 사용
+import datetime
+
+# NOTHING : 아직 상태가 안정해짐 or 현재 프레임에서 공을 탐지하지 못함, WAITING : 가만히 있는 상태, MOVING : 공이 움직이는 상태
+global STATUS
+STATUS = {'NOTHING' : 0, 'WAITING' : 1, 'MOVING' : 2}
 BALL_COLOR = {'RED' : 0, 'WHITE' : 1, 'YELLOW' : 2}
 
 # 공의 위치를 나타낼 때 사용하는 클래스
+# 22.2.17에 bbox의 점 대신 중심좌표를 저장하게끔 설정
 class COORDI :
-    def __init__(self, x_min_, y_min_, x_max_, y_max_) :
-        self.min_x = x_min_
-        self.min_y = y_min_
-        self.max_x = x_max_
-        self.max_y = y_max_
-    def get_center(self) : # 공의 최근 경로를 보여줄 때 중앙 좌표만 보여줄려고 만든 좌표(cv2.circle으로 중앙 좌표만 출력)
-        return (int((self.min_x + self.max_x)/2), int((self.min_y + self.max_y)/2)) 
+    def __init__(self, x_, y_, r_) :
+        self.x = x_
+        self.y = y_
+        self.r = r_
+    def get_center(self) : 
+        return (self.x, self.y)
         
 # 카메라에 탐지되는 공의 최근 10개 좌표를 저장하는 클래스
 class BALL :
@@ -32,33 +35,58 @@ class BALL :
         # 색깔의 index
         self.color_idx = color_idx
         self.status = STATUS['NOTHING']
+        self.isMoving_oneTIME = False
+        self.movingStartTime = 0
         
     # bbox를 BALL에 저장하는 메소드
-    def set_coordi(self, coordi) :
-        coordi = coordi.astype(np.int32)
-
+    # extract bbox in image and use HoughCircles() to get more precise ball's coordinate and radius
+    def set_coordi(self, image, coordi, isHit) :
+        isSetCOORDI = False # 현재 프레임에서 공을 탐지했는가?
         if np.sum(np.abs(coordi)) != 0 :
-            temp_coordi = COORDI(coordi[0], coordi[1], coordi[2], coordi[3])
-            self.coordi_list.append(temp_coordi)
-        else : 
+            ball_with_bbox = image[np.floor(coordi[1]).astype(np.int32):np.ceil(coordi[3]).astype(np.int32), np.floor(coordi[0]).astype(np.int32):np.ceil(coordi[2]).astype(np.int32),:] 
+            ball_with_bbox_grayscale = cv2.GaussianBlur(cv2.cvtColor(ball_with_bbox, cv2.COLOR_BGR2GRAY), (0, 0), 1) 
+            circles = cv2.HoughCircles(ball_with_bbox_grayscale, cv2.HOUGH_GRADIENT, 1, 10, param1 = 250, param2 = 10, minRadius = 13, maxRadius = 18)  
+
+            isSetCOORDI = True
+
+            temp_coordi = None
+            base_coordi = (coordi[0], coordi[1])# 전체 이미지에서 얻은 bbbox의 left-up 꼭지점 좌표
+            if type(circles) != type(None) :
+                # print(circles[0].shape[0])
+                for i in circles[0]:
+                    temp_coordi = COORDI(int(base_coordi[0] + i[0]), int(base_coordi[1] + i[1]), np.ceil(i[2]).astype(np.int32))
+                    
+            if temp_coordi == None :
+                width = coordi[2] - coordi[0]
+                height = coordi[3] - coordi[1]
+                temp_coordi = COORDI(int(base_coordi[0] + width/2), int(base_coordi[1] + height/2), np.ceil(min(width, height)/2).astype(np.int32))
+            if len(self.coordi_list) >= 1 :
+                diff_with_preCOORDI_x = self.coordi_list[-1].x - temp_coordi.x
+                diff_with_preCOORDI_y = self.coordi_list[-1].y - temp_coordi.y
+
+                distance_with_preCOORDI = np.sqrt(diff_with_preCOORDI_x * diff_with_preCOORDI_x + diff_with_preCOORDI_y * diff_with_preCOORDI_y)
+
+                if self.isMoving_oneTIME == False :
+                    if float(distance_with_preCOORDI) > 8.0 :
+                        self.status = STATUS['MOVING']
+                        self.movingStartTime = datetime.datetime.now()
+                        self.isMoving_oneTIME = True
+                    else : 
+                        self.status = STATUS['WAITING']
+                else :
+                    if float(distance_with_preCOORDI) > 1.0 : 
+                        self.status = STATUS['MOVING']
+                    else :
+                        self.status = STATUS['WAITING'] 
+                self.coordi_list.append(temp_coordi)
+            else : 
+                self.coordi_list.append(temp_coordi)
+        else :
             self.status = STATUS['NOTHING']
-           
-        if len(self.coordi_list) > 10 :
-            self.coordi_list.pop(0)
-
-    def print_coordi(self, image) :
-
-        if self.color_idx == BALL_COLOR['RED'] :
-            color = (255, 0, 0)
-        elif self.color_idx == BALL_COLOR['WHITE'] :
-            color = (255, 255, 255)
-        elif self.color_idx == BALL_COLOR['YELLOW'] :
-            color = (255,255,0)
-        
-        for ball_coordi in self.coordi_list : 
-            cv2.circle(image, ball_coordi.get_center(), 1, color, -1) # 공의 최근 경로를 출력
-
-        return image
+            if len(self.coordi_list) > 0 :
+                self.coordi_list.pop(0)
+                
+        return isSetCOORDI
 
 # YOLOv3을 불러오기 위한 메소드
 def ready_for_detect() :
@@ -86,6 +114,12 @@ def main() :
     yellow_ball = BALL(BALL_COLOR['YELLOW'])
     red_ball = BALL(BALL_COLOR['RED'])
 
+    score = 0
+    FirstMovingBall_COLOR = None
+    Waiting_start_time = None
+
+    ball_crush_stack = [0, 0, 0] # 각 공을 큐대로 쳤을 때 다른 공과 충돌한 횟수. 빨간공, 흰공, 노란공 순서
+
     # 카메라로 프레임을 캡처하지 못했으면 프로그램 종료
     if not capture.isOpened():
         print("Could not open webcam")
@@ -100,8 +134,7 @@ def main() :
         elif cv2.waitKey(1) == ord('q') : # q 누르면 탈출
             break
         frame = frame[:, :, [2, 1, 0]] # # BGR -> RGB. numpy와 pytorch는 RGB를 사용한다 
-        detect_biliard_ball(model, frame.copy(), device, 'Detect_ball', [white_ball, yellow_ball, red_ball]) # 공 탐지 후 화면에 보여줌
-        
+        frame, score, FirstMovingBall_COLOR, Waiting_start_time, ball_crush_stack = detect_biliard_ball(model, frame.copy(), device, 'Detect_ball', [white_ball, yellow_ball, red_ball], score, FirstMovingBall_COLOR, Waiting_start_time, ball_crush_stack) # 공 탐지 후 화면에 보여줌
     capture.release() # 캡처 중지
     cv2.destroyAllWindows() # 화면 생성 중단
 
