@@ -301,8 +301,6 @@ def detect_biliard_ball(model, image, device, window_name, BALLS, score, FirstMo
         cv2.putText(image, distance_yr_str, (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 1,(255,0,0),2)
         cv2.putText(image, ball_crush_stack_print, (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 1,(255,0,0),2)
 
-        
-
     if FirstMovingBall_COLOR != None :
         color_str = None
         if FirstMovingBall_COLOR == BALL_COLOR['RED'] :

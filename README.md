@@ -155,14 +155,12 @@ labelme를 이용해 모든 이미지에 대한 라벨링을 수행한 뒤, YOLO
 <br>
 
 ## 4. 테스트 결과
-학습시킨 YOLOv3으로 당구공 탐지를 수행했을 때 결과는 다음과 같습니다. 
+학습시킨 YOLOv3으로 당구공 탐지를 수행했을 때 결과는 다음과 같습니다. (22.02.18)
+<img width="1551" alt="깃허브에 올릴 실행사진" src="https://user-images.githubusercontent.com/50979281/154778355-260d9209-7d15-49e2-81be-5830eaebc84b.png">
 
-결과 1             |  결과 2
-:-------------------------:|:-------------------------:
-<img width="600" alt="스크린샷 2022-01-30 오전 1 02 44" src="https://user-images.githubusercontent.com/50979281/153019860-58feb3fa-b74a-40b3-afd8-10de5dd5cc5b.jpg"> |  <img width="600" alt="스크린샷 2022-01-30 오전 1 02 44" src="https://user-images.githubusercontent.com/50979281/153020323-3fa208d2-66ba-4af1-bc6e-9b65db3a3b2c.jpg">
+YOLO가 '공이 있을만한 영역'을 탐지하면 opencv에서 제공하는 [cv2.HoughCircles()](https://docs.opencv.org/3.4/da/d53/tutorial_py_houghcircles.html)을 사용해 정확한 공의 영역을 검출합니다. 
 
-
-당구대에 흰공이 없거나 흰공의 confidence가 매우 낮아 nms를 통과하지 못하는 경우가 아니면 손과 당구대를 공으로 인식하는 일이 없었습니다. 
+YOLOv3가 공의 특징(특성 색갈의 픽셀이 여러개 모여있는 패턴)을 잘 탐지하는 점과 houchcircle이 '구형'을 탐지한다는 점을 조합했을 때 성능, 속도 두가지 면에서 긍정적인 효과가 나올 것이라 판단하였는데 생각보다 결과가 잘나오고 있습니다. 
 
 <br> <br>
 
@@ -175,5 +173,6 @@ labelme를 이용해 모든 이미지에 대한 라벨링을 수행한 뒤, YOLO
 
 <br>
 
- 이를 해결하기 위해 데이터셋의 라벨링 작업을 다시 하거나 데이터셋의 크기를 키우는 작업 등을 수행하였으며 개선 작업에 관한 자세한 내용은 [update_history.md](./update_history.md)에서 확인하실 수 있습니다.
-
+ 이를 해결하기 위해 데이터셋의 라벨링 작업을 다시 하거나 데이터셋의 크기를 키우는 작업 등을 수행하였습니다. 그리고 공 검출방식에 대한 변화도 수행하였습니다. 
+ 
+  개선 작업에 관한 자세한 내용은 [update_history.md](./update_history.md)에서 확인하실 수 있습니다.

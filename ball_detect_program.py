@@ -9,7 +9,6 @@ import numpy as np
 import os
 import cv2
 
-# 이미지 저장에 사용
 import datetime
 
 # NOTHING : 아직 상태가 안정해짐 or 현재 프레임에서 공을 탐지하지 못함, WAITING : 가만히 있는 상태, MOVING : 공이 움직이는 상태
@@ -40,13 +39,52 @@ class BALL :
         
     # bbox를 BALL에 저장하는 메소드
     # extract bbox in image and use HoughCircles() to get more precise ball's coordinate and radius
-    def set_coordi(self, image, coordi, isHit) :
+    # HoughCircles로 빨간공이 잘 탐지되지 않는 문제가 있다. 어떻게 해결하면 되는걸까
+    def set_coordi(self, image, coordi, FirstMovingBall_COLOR) :
         isSetCOORDI = False # 현재 프레임에서 공을 탐지했는가?
         if np.sum(np.abs(coordi)) != 0 :
+            coordi[coordi[:] < 0] = 0.0
             ball_with_bbox = image[np.floor(coordi[1]).astype(np.int32):np.ceil(coordi[3]).astype(np.int32), np.floor(coordi[0]).astype(np.int32):np.ceil(coordi[2]).astype(np.int32),:] 
-            ball_with_bbox_grayscale = cv2.GaussianBlur(cv2.cvtColor(ball_with_bbox, cv2.COLOR_BGR2GRAY), (0, 0), 1) 
-            circles = cv2.HoughCircles(ball_with_bbox_grayscale, cv2.HOUGH_GRADIENT, 1, 10, param1 = 250, param2 = 10, minRadius = 13, maxRadius = 18)  
+            ball_with_bbox = ball_with_bbox[:, :, [2, 1, 0]]
 
+            remove_biliard_field_filter = np.where((ball_with_bbox[:,:,0] < 200) & (ball_with_bbox[:,:,1] < 200) & (ball_with_bbox[:,:,2] < 200))
+            
+            # remove biliard field
+            ball_with_bbox[remove_biliard_field_filter] = 0
+            ball_with_bbox[ball_with_bbox[:,:,2] < 120] = 0
+            ball_with_bbox_grayscale = cv2.cvtColor(ball_with_bbox, cv2.COLOR_BGR2GRAY)
+
+            threshold_redball = 200
+            threshold_whiteball = 237
+            threshold_yellowball = 235
+
+            if self.color_idx == BALL_COLOR['RED'] :
+                ball_with_bbox_grayscale[ball_with_bbox_grayscale[:,:] > threshold_redball] = 0
+                cv2.imshow('red_bbox_window', ball_with_bbox_grayscale)
+            elif self.color_idx == BALL_COLOR['WHITE'] : 
+                ball_with_bbox_grayscale[ball_with_bbox_grayscale[:,:] <= threshold_whiteball] = 0
+                cv2.imshow('white_bbox_window', ball_with_bbox_grayscale)
+            elif self.color_idx == BALL_COLOR['YELLOW'] :
+                ball_with_bbox_grayscale[ball_with_bbox_grayscale[:,:] > threshold_yellowball] = 0
+                cv2.imshow('yellow_bbox_window', ball_with_bbox_grayscale)
+
+            # # need many editing
+            # if self.color_idx == BALL_COLOR['RED'] :
+            #     # red_ball_filter_1 = np.where((ball_with_bbox[:,:,1] > 230) & (ball_with_bbox[:,:,2] > 230))
+            #     # ball_with_bbox[red_ball_filter_1] = 0
+            #     cv2.imshow('red_bbox_window', ball_with_bbox)
+            # elif self.color_idx == BALL_COLOR['WHITE'] : 
+            #     # filter_white_ball = np.where((ball_with_bbox[:,:,0] < 180) | (ball_with_bbox[:,:,1] <= 180) | (ball_with_bbox[:,:,2] <= 180))
+            #     # ball_with_bbox[filter_white_ball] = 0
+            #     cv2.imshow('white_bbox_window', ball_with_bbox)
+            # elif self.color_idx == BALL_COLOR['YELLOW'] :
+            #     yellow_ball_filter = np.where((ball_with_bbox[:,:,0] < 200) & (ball_with_bbox[:,:,1] < 200) & (ball_with_bbox[:,:,2] < 200))
+            #     # ball_with_bbox[ball_with_bbox[:,:,0] <= 120] = 0
+            #     # ball_with_bbox[ball_with_bbox[:,:,1] <= 120] = 0
+            #     # ball_with_bbox[ball_with_bbox[:,:,2] <= 120] = 0
+            #     cv2.imshow('yellow_bbox_window', ball_with_bbox)
+
+            circles = cv2.HoughCircles(ball_with_bbox_grayscale, cv2.HOUGH_GRADIENT, 1, 5, param1 = 300, param2 = 10, minRadius = 10, maxRadius = 20)  
             isSetCOORDI = True
 
             temp_coordi = None
@@ -59,7 +97,8 @@ class BALL :
             if temp_coordi == None :
                 width = coordi[2] - coordi[0]
                 height = coordi[3] - coordi[1]
-                temp_coordi = COORDI(int(base_coordi[0] + width/2), int(base_coordi[1] + height/2), np.ceil(min(width, height)/2).astype(np.int32))
+                temp_coordi = COORDI(int(base_coordi[0] + width/2), int(base_coordi[1] + height/2), np.ceil(min(width, height)/2).astype(np.int32)- 2)
+
             if len(self.coordi_list) >= 1 :
                 diff_with_preCOORDI_x = self.coordi_list[-1].x - temp_coordi.x
                 diff_with_preCOORDI_y = self.coordi_list[-1].y - temp_coordi.y
@@ -67,7 +106,7 @@ class BALL :
                 distance_with_preCOORDI = np.sqrt(diff_with_preCOORDI_x * diff_with_preCOORDI_x + diff_with_preCOORDI_y * diff_with_preCOORDI_y)
 
                 if self.isMoving_oneTIME == False :
-                    if float(distance_with_preCOORDI) > 8.0 :
+                    if distance_with_preCOORDI > 15.0 : # the ball i hit
                         self.status = STATUS['MOVING']
                         self.movingStartTime = datetime.datetime.now()
                         self.isMoving_oneTIME = True
@@ -81,6 +120,7 @@ class BALL :
                 self.coordi_list.append(temp_coordi)
             else : 
                 self.coordi_list.append(temp_coordi)
+
         else :
             self.status = STATUS['NOTHING']
             if len(self.coordi_list) > 0 :
@@ -110,9 +150,10 @@ def main() :
     capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
     # 공의 위치정보를 담을 BALL 클래스의 객체들을 정의
+    red_ball = BALL(BALL_COLOR['RED'])
     white_ball = BALL(BALL_COLOR['WHITE'])
     yellow_ball = BALL(BALL_COLOR['YELLOW'])
-    red_ball = BALL(BALL_COLOR['RED'])
+    
 
     score = 0
     FirstMovingBall_COLOR = None
@@ -134,7 +175,7 @@ def main() :
         elif cv2.waitKey(1) == ord('q') : # q 누르면 탈출
             break
         frame = frame[:, :, [2, 1, 0]] # # BGR -> RGB. numpy와 pytorch는 RGB를 사용한다 
-        frame, score, FirstMovingBall_COLOR, Waiting_start_time, ball_crush_stack = detect_biliard_ball(model, frame.copy(), device, 'Detect_ball', [white_ball, yellow_ball, red_ball], score, FirstMovingBall_COLOR, Waiting_start_time, ball_crush_stack) # 공 탐지 후 화면에 보여줌
+        frame, score, FirstMovingBall_COLOR, Waiting_start_time, ball_crush_stack = detect_biliard_ball(model, frame.copy(), device, 'Detect_ball', [red_ball, white_ball, yellow_ball], score, FirstMovingBall_COLOR, Waiting_start_time, ball_crush_stack) # 공 탐지 후 화면에 보여줌
     capture.release() # 캡처 중지
     cv2.destroyAllWindows() # 화면 생성 중단
 
