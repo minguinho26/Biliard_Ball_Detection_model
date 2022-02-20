@@ -408,3 +408,36 @@ if ps_multi_balls.size()[0] > 0 and t_multi_balls.size()[0] : # two_balls, three
 추후 에러가 발생하는 경우를 사진으로 첨부하도록 하겠습니다.
 
 
+**22.02.20** : 공의 bbox를 상하좌우 2.0픽셀씩만 늘리고 학습을 진행했습니다. 학습 결과는 다음과 같습니다. 이전에 학습한 것과 비교했을 때 뭉쳐있는 공을 탐지하는 능력이 상승한 것을 확인할 수 있습니다. 
+
+* 빨간공, 흰공, 노란공을 찾을 수 없을 때 two_balls, three_balls에서 색상필터를 하나씩 적용하여 공을 찾는 방법도 생각하고 있습니다.
+
+| Type        | Value               |
+|-------------|---------------------|
+| IoU loss    | 0.2458430528640747  |
+| Object loss | 0.06006336212158203 |
+| Class loss  | 0.5271962881088257  |
+| Batch loss  | 0.8331027030944824  |
+
+ Index | Class              | AP      |
+|-------|--------------------|---------|
+| 0     | biliard_stick      | 0.28964 |
+| 1     | hand               | 0.71286 |
+| 2     | two_balls          | 0.52652 |
+| 3     | three_balls        | 0.60000 |
+| 4     | red_ball           | 0.96948 |
+| 5     | white_ball         | 0.98271 |
+| 6     | yellow_ball        | 0.97203 |
+| 7     | moving_red_ball    | 0.49183 |
+| 8     | moving_white_ball  | 0.66611 |
+| 9     | moving_yellow_ball | 0.53018 |
+
+---- mAP 0.69013 ----
+
+| Type                 | Value    |
+|----------------------|----------|
+| validation precision | 0.546411 |
+| validation recall    | 0.784375 |
+| validation mAP       | 0.690132 |
+| validation f1        | 0.630977 |
+
