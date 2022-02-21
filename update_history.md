@@ -395,6 +395,38 @@ if ps_multi_balls.size()[0] > 0 and t_multi_balls.size()[0] : # two_balls, three
 **22.02.17** : 공을 친 뒤 다시 멈출 때까지 공의 궤적을 그리게끔 구현했습니다. 만약 내가 친 공이 나머지 두 공을 건드릴 경우 점수가 상승하게끔 구현했으나 아직 제대로 작동하지는 않는 상황입니다. 
 그리고 공을 탐지할 때 '공이 있는 bbox를 YOLOv3으로 탐지' -> 'opencv의 houghcircles()로 해당 영역에서 공을 탐지'의 두단계를 수행하게끔 만들었습니다. 만약 houghcircles()로 공을 찾을 수 없는 경우에는 bbox의 좌표를 이용해 공의 위치를 알렸습니다. 아직 불안정한 코드라 많은 수정이 필요합니다.
 
+그리고 공의 bbox를 상하좌우 3픽셀씩 늘린 데이터셋을 새로 생성한 뒤 학습을 수행했으며 결과는 다음과 같습니다. 
+
+| Type        | Value                |
+|-------------|----------------------|
+| IoU loss    | 0.13242006301879883  |
+| Object loss | 0.030031338334083557 |
+| Class loss  | 0.3855709731578827   |
+| Batch loss  | 0.5480223894119263   |
+
+
+| Index | Class              | AP      |
+|-------|--------------------|---------|
+| 0     | biliard_stick      | 0.36440 |
+| 1     | hand               | 0.71033 |
+| 2     | two_balls          | 0.47845 |
+| 3     | three_balls        | 0.55114 |
+| 4     | red_ball           | 0.97533 |
+| 5     | white_ball         | 0.97828 |
+| 6     | yellow_ball        | 0.97254 |
+| 7     | moving_red_ball    | 0.56465 |
+| 8     | moving_white_ball  | 0.52504 |
+| 9     | moving_yellow_ball | 0.65193 |
+
+---- mAP = 0.68002 ----
+
+| Type                 | Value    |
+|----------------------|----------|
+| validation precision | 0.582968 |
+| validation recall    | 0.790646 |
+| validation mAP       | 0.680018 |
+| validation f1        | 0.661801 |
+
 <br>
 
  **22.02.19** : 두개의 곂쳐진 공에서 하나만 판정하는 부분이 어느정도 개선되었으나 빨간공과 노란공이 곂쳐있을 때 빨간공을 잘 탐지하지 못하는 현상을 발견했습니다. 그리고 공이 제대로 탐지되지 않는 경우를 확인하고자 두가지 색상의 공을 한 곳에 모았을 때 발생하는 에러를 확인해봤는데요, 다음과 같았습니다. 
@@ -441,3 +473,31 @@ if ps_multi_balls.size()[0] > 0 and t_multi_balls.size()[0] : # two_balls, three
 | validation mAP       | 0.690132 |
 | validation f1        | 0.630977 |
 
+**22.02.21** : 2.20에 학습시킨 모델이 측정된 수치에 비해 실제 성능이 좋지 않아 2.17에 학습시킨 모델을 최종적으로 사용하기로 결정하였습니다. <br>
+YOLOv3로 추출한 bbox에서 빨간색, 흰색, 노란색 픽셀만 추출한 뒤 최종적으로 공을 판별하는 방법을 사용해봤는데 공이 서로 인접한 상황에서도 공을 탐지하는 능력이 많이 좋아진 것을 확인하였습니다. 
+
+~~~python
+if self.color_idx == BALL_COLOR['RED'] :
+    remove_whiteball = np.where((diff_B_R[:,:] < 30) & (ball_with_bbox[:,:, 0] > 180) & (ball_with_bbox[:,:, 1] > 180) & (ball_with_bbox[:,:, 2] > 180))
+    remove_yellowball = np.where((diff_R_G[:,:] < 60) & (ball_with_bbox[:,:,0] < 220))
+    ball_with_bbox_grayscale = cv2.cvtColor(ball_with_bbox, cv2.COLOR_BGR2GRAY)
+    ball_with_bbox_grayscale[remove_whiteball] = 0 
+    ball_with_bbox_grayscale[remove_yellowball] = 0
+
+elif self.color_idx == BALL_COLOR['WHITE'] :
+    white_ball_filter = np.where((diff_B_R[:,:] > 10) & (ball_with_bbox[:,:, 0] < 210) | (ball_with_bbox[:,:, 1] < 210) | (ball_with_bbox[:,:, 2] < 210))
+    ball_with_bbox_grayscale = cv2.cvtColor(ball_with_bbox, cv2.COLOR_BGR2GRAY)
+    ball_with_bbox_grayscale[white_ball_filter] = 0 
+                
+elif self.color_idx == BALL_COLOR['YELLOW'] :
+    remove_redball = np.where((diff_R_G[:,:] >  60) & (ball_with_bbox[:,:, 0] < 220))
+    remove_whiteball = np.where((diff_B_G < 80) & (ball_with_bbox[:,:,0] > 200))
+    ball_with_bbox_grayscale = cv2.cvtColor(ball_with_bbox, cv2.COLOR_BGR2GRAY)
+    ball_with_bbox_grayscale[remove_whiteball] = 0 
+    ball_with_bbox_grayscale[remove_redball] = 0 
+    ball_with_bbox_grayscale[ball_with_bbox_grayscale < 120] = 0                    
+~~~
+R,G,B 채널을 이용해 빨간공을 탐지한 bbox에서는 빨간색 픽셀만 남기는 등의 작업을 수행하였습니다.
+
+
+여기에 색상별 필터링 적용해서 공 검출에 사용한 방법을 적고 readme에 더 자세히 적기

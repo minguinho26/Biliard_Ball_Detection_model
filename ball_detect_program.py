@@ -9,6 +9,7 @@ import numpy as np
 import os
 import cv2
 
+# 이미지 저장에 사용
 import datetime
 
 # NOTHING : 아직 상태가 안정해짐 or 현재 프레임에서 공을 탐지하지 못함, WAITING : 가만히 있는 상태, MOVING : 공이 움직이는 상태
@@ -40,93 +41,108 @@ class BALL :
     # bbox를 BALL에 저장하는 메소드
     # extract bbox in image and use HoughCircles() to get more precise ball's coordinate and radius
     # HoughCircles로 빨간공이 잘 탐지되지 않는 문제가 있다. 어떻게 해결하면 되는걸까
-    def set_coordi(self, image, coordi, FirstMovingBall_COLOR) :
+    def set_coordi(self, image, coordi, FirstMovingBall_COLOR, ball_crush_stack) :
         isSetCOORDI = False # 현재 프레임에서 공을 탐지했는가?
         if np.sum(np.abs(coordi)) != 0 :
             coordi[coordi[:] < 0] = 0.0
             ball_with_bbox = image[np.floor(coordi[1]).astype(np.int32):np.ceil(coordi[3]).astype(np.int32), np.floor(coordi[0]).astype(np.int32):np.ceil(coordi[2]).astype(np.int32),:] 
             ball_with_bbox = ball_with_bbox[:, :, [2, 1, 0]]
 
-            remove_biliard_field_filter = np.where((ball_with_bbox[:,:,0] < 200) & (ball_with_bbox[:,:,1] < 200) & (ball_with_bbox[:,:,2] < 200))
+            diff_R_G = np.abs(ball_with_bbox[:,:,2].astype(np.int32) - ball_with_bbox[:,:,1].astype(np.int32))
+            diff_B_R = np.abs(ball_with_bbox[:,:,0].astype(np.int32) - ball_with_bbox[:,:,2].astype(np.int32))
+            diff_B_G = np.abs(ball_with_bbox[:,:,0].astype(np.int32) - ball_with_bbox[:,:,1].astype(np.int32))
             
-            # remove biliard field
-            ball_with_bbox[remove_biliard_field_filter] = 0
-            ball_with_bbox[ball_with_bbox[:,:,2] < 120] = 0
-            ball_with_bbox_grayscale = cv2.cvtColor(ball_with_bbox, cv2.COLOR_BGR2GRAY)
-
-            threshold_redball = 200
-            threshold_whiteball = 237
-            threshold_yellowball = 235
-
             if self.color_idx == BALL_COLOR['RED'] :
-                ball_with_bbox_grayscale[ball_with_bbox_grayscale[:,:] > threshold_redball] = 0
-                cv2.imshow('red_bbox_window', ball_with_bbox_grayscale)
-            elif self.color_idx == BALL_COLOR['WHITE'] : 
-                ball_with_bbox_grayscale[ball_with_bbox_grayscale[:,:] <= threshold_whiteball] = 0
-                cv2.imshow('white_bbox_window', ball_with_bbox_grayscale)
+                remove_whiteball = np.where((diff_B_R[:,:] < 30) & (ball_with_bbox[:,:, 0] > 180) & (ball_with_bbox[:,:, 1] > 180) & (ball_with_bbox[:,:, 2] > 180))
+                remove_yellowball = np.where((diff_R_G[:,:] < 60) & (ball_with_bbox[:,:,0] < 220))
+                ball_with_bbox_grayscale = cv2.cvtColor(ball_with_bbox, cv2.COLOR_BGR2GRAY)
+                ball_with_bbox_grayscale[remove_whiteball] = 0 
+                ball_with_bbox_grayscale[remove_yellowball] = 0
+
+            elif self.color_idx == BALL_COLOR['WHITE'] :
+                white_ball_filter = np.where((diff_B_R[:,:] > 10) & (ball_with_bbox[:,:, 0] < 210) | (ball_with_bbox[:,:, 1] < 210) | (ball_with_bbox[:,:, 2] < 210))
+                ball_with_bbox_grayscale = cv2.cvtColor(ball_with_bbox, cv2.COLOR_BGR2GRAY)
+                ball_with_bbox_grayscale[white_ball_filter] = 0 
+                
             elif self.color_idx == BALL_COLOR['YELLOW'] :
-                ball_with_bbox_grayscale[ball_with_bbox_grayscale[:,:] > threshold_yellowball] = 0
-                cv2.imshow('yellow_bbox_window', ball_with_bbox_grayscale)
+                remove_redball = np.where((diff_R_G[:,:] >  60) & (ball_with_bbox[:,:, 0] < 220))
+                remove_whiteball = np.where((diff_B_G < 80) & (ball_with_bbox[:,:,0] > 200))
+                ball_with_bbox_grayscale = cv2.cvtColor(ball_with_bbox, cv2.COLOR_BGR2GRAY)
+                ball_with_bbox_grayscale[remove_whiteball] = 0 
+                ball_with_bbox_grayscale[remove_redball] = 0 
+                ball_with_bbox_grayscale[ball_with_bbox_grayscale < 120] = 0
 
-            # # need many editing
-            # if self.color_idx == BALL_COLOR['RED'] :
-            #     # red_ball_filter_1 = np.where((ball_with_bbox[:,:,1] > 230) & (ball_with_bbox[:,:,2] > 230))
-            #     # ball_with_bbox[red_ball_filter_1] = 0
-            #     cv2.imshow('red_bbox_window', ball_with_bbox)
-            # elif self.color_idx == BALL_COLOR['WHITE'] : 
-            #     # filter_white_ball = np.where((ball_with_bbox[:,:,0] < 180) | (ball_with_bbox[:,:,1] <= 180) | (ball_with_bbox[:,:,2] <= 180))
-            #     # ball_with_bbox[filter_white_ball] = 0
-            #     cv2.imshow('white_bbox_window', ball_with_bbox)
-            # elif self.color_idx == BALL_COLOR['YELLOW'] :
-            #     yellow_ball_filter = np.where((ball_with_bbox[:,:,0] < 200) & (ball_with_bbox[:,:,1] < 200) & (ball_with_bbox[:,:,2] < 200))
-            #     # ball_with_bbox[ball_with_bbox[:,:,0] <= 120] = 0
-            #     # ball_with_bbox[ball_with_bbox[:,:,1] <= 120] = 0
-            #     # ball_with_bbox[ball_with_bbox[:,:,2] <= 120] = 0
-            #     cv2.imshow('yellow_bbox_window', ball_with_bbox)
-
-            circles = cv2.HoughCircles(ball_with_bbox_grayscale, cv2.HOUGH_GRADIENT, 1, 5, param1 = 300, param2 = 10, minRadius = 10, maxRadius = 20)  
+            # 덩어리가 뭉친 곳을 공이라 판정하는게 필요
+            circles = cv2.HoughCircles(ball_with_bbox_grayscale, cv2.HOUGH_GRADIENT, 1, 26, param1 = 300, param2 = 10, minRadius = 10, maxRadius = 15)  
             isSetCOORDI = True
 
             temp_coordi = None
             base_coordi = (coordi[0], coordi[1])# 전체 이미지에서 얻은 bbbox의 left-up 꼭지점 좌표
             if type(circles) != type(None) :
-                # print(circles[0].shape[0])
+                avr_x = 0
+                avr_y = 0
+                avr_r = 0
+                count = 0
                 for i in circles[0]:
-                    temp_coordi = COORDI(int(base_coordi[0] + i[0]), int(base_coordi[1] + i[1]), np.ceil(i[2]).astype(np.int32))
-                    
-            if temp_coordi == None :
-                width = coordi[2] - coordi[0]
-                height = coordi[3] - coordi[1]
-                temp_coordi = COORDI(int(base_coordi[0] + width/2), int(base_coordi[1] + height/2), np.ceil(min(width, height)/2).astype(np.int32)- 2)
-
-            if len(self.coordi_list) >= 1 :
-                diff_with_preCOORDI_x = self.coordi_list[-1].x - temp_coordi.x
-                diff_with_preCOORDI_y = self.coordi_list[-1].y - temp_coordi.y
-
-                distance_with_preCOORDI = np.sqrt(diff_with_preCOORDI_x * diff_with_preCOORDI_x + diff_with_preCOORDI_y * diff_with_preCOORDI_y)
-
-                if self.isMoving_oneTIME == False :
-                    if distance_with_preCOORDI > 15.0 : # the ball i hit
-                        self.status = STATUS['MOVING']
-                        self.movingStartTime = datetime.datetime.now()
-                        self.isMoving_oneTIME = True
+                    if avr_x != 0 :
+                        diff_x = np.abs(avr_x - int(base_coordi[0] + i[0])).astype(np.float32)
+                        diff_y = np.abs(avr_y - int(base_coordi[1] + i[1])).astype(np.float32)
+                        distance = np.sqrt(diff_x * diff_x + diff_y * diff_y)
+                        if distance <= 5.0 :
+                            avr_x += int(base_coordi[0] + i[0])
+                            avr_y += int(base_coordi[1] + i[1])
+                            avr_r += np.ceil(i[2]).astype(np.int32)
+                            count += 1
                     else : 
-                        self.status = STATUS['WAITING']
-                else :
-                    if float(distance_with_preCOORDI) > 1.0 : 
-                        self.status = STATUS['MOVING']
+                        avr_x += int(base_coordi[0] + i[0])
+                        avr_y += int(base_coordi[1] + i[1])
+                        avr_r += np.ceil(i[2]).astype(np.int32)
+                        count += 1
+                avr_x /= count
+                avr_y /= count
+                avr_r /= count
+                if self.color_idx == 2 :
+                    avr_r += 1
+
+                temp_coordi = COORDI(int(avr_x), int(avr_y), int(avr_r))
+            if temp_coordi != None :             
+                if len(self.coordi_list) >= 1 :
+                    
+                    if self.isMoving_oneTIME == False :
+                        diff_with_initCOORDI_x = self.coordi_list[0].x - temp_coordi.x
+                        diff_with_initCOORDI_y = self.coordi_list[0].y - temp_coordi.y
+
+                        distance_with_initCOORDI = np.sqrt(diff_with_initCOORDI_x * diff_with_initCOORDI_x + diff_with_initCOORDI_y * diff_with_initCOORDI_y)
+
+                        if distance_with_initCOORDI > 8.0 : 
+                            self.status = STATUS['MOVING']
+                            self.movingStartTime = datetime.datetime.now()
+                            if FirstMovingBall_COLOR == None :
+                                FirstMovingBall_COLOR = self.color_idx
+                                ball_crush_stack[FirstMovingBall_COLOR] = 1
+                            self.isMoving_oneTIME = True
+                        else : 
+                            self.status = STATUS['WAITING']
                     else :
-                        self.status = STATUS['WAITING'] 
-                self.coordi_list.append(temp_coordi)
-            else : 
-                self.coordi_list.append(temp_coordi)
+                        diff_with_preCOORDI_x = self.coordi_list[-1].x - temp_coordi.x
+                        diff_with_preCOORDI_y = self.coordi_list[-1].y - temp_coordi.y
+
+                        distance_with_preCOORDI = np.sqrt(diff_with_preCOORDI_x * diff_with_preCOORDI_x + diff_with_preCOORDI_y * diff_with_preCOORDI_y)
+
+                        if float(distance_with_preCOORDI) > 1.0 : 
+                            self.status = STATUS['MOVING']
+                        else :
+                            self.status = STATUS['WAITING'] 
+                    self.coordi_list.append(temp_coordi)
+                else : 
+                    self.coordi_list.append(temp_coordi)
 
         else :
             self.status = STATUS['NOTHING']
             if len(self.coordi_list) > 0 :
                 self.coordi_list.pop(0)
                 
-        return isSetCOORDI
+        return isSetCOORDI, FirstMovingBall_COLOR, ball_crush_stack
 
 # YOLOv3을 불러오기 위한 메소드
 def ready_for_detect() :
@@ -176,6 +192,7 @@ def main() :
             break
         frame = frame[:, :, [2, 1, 0]] # # BGR -> RGB. numpy와 pytorch는 RGB를 사용한다 
         frame, score, FirstMovingBall_COLOR, Waiting_start_time, ball_crush_stack = detect_biliard_ball(model, frame.copy(), device, 'Detect_ball', [red_ball, white_ball, yellow_ball], score, FirstMovingBall_COLOR, Waiting_start_time, ball_crush_stack) # 공 탐지 후 화면에 보여줌
+
     capture.release() # 캡처 중지
     cv2.destroyAllWindows() # 화면 생성 중단
 

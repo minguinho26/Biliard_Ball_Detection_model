@@ -8,6 +8,8 @@ import numpy as np
 import cv2
 import timeit
 import datetime
+import copy
+import math
 
 import torch
 import torchvision.transforms as transforms
@@ -33,13 +35,13 @@ MOVING_RED_BALL_INDEX    = 7
 MOVING_WHITE_BALL_INDEX  = 8
 MOVING_YELLOW_BALL_INDEX = 9
 
+TWO_BALLS_INDEX          = 2
+THREE_BALLS_INDEX        = 3
+
 
 # ====================================
 # 전역변수 선언, 정의 =====================
 # ====================================
-
-# 당구대에서 탐지된 공들 중 넓이가 일정 수치보다 높은 공을 걸러내는 함수
-# 하얀 접시가 공으로 판정되는 일이 발생해 이러한 일을 방지하고자 사용
 def filter_in_BiliardField(detect_ball_coordi_group, threashold_area) :
 
     width_group = detect_ball_coordi_group[:,2] - detect_ball_coordi_group[:,0]
@@ -51,7 +53,6 @@ def filter_in_BiliardField(detect_ball_coordi_group, threashold_area) :
 
     return detect_ball_coordi_group
 
-# 두 공 사이의 거리를 측정하는 함수
 def get_distance(ball1, ball2) : 
 
     point1 = ball1.coordi_list[-1].get_center()
@@ -62,57 +63,97 @@ def get_distance(ball1, ball2) :
 
     return np.sqrt(diff_x * diff_x + diff_y * diff_y)
 
-# 내가 친 공이 나머지 두 공을 맞췄는지 판정하는 함수
-# ball_crush_stack[target_color_idx]가 1이면 내가 친 공이 공 하나를 맞춘거고 2면 내가 친 공이 공 두개를 맞춘 상황 == 득점
+def get_moving_angle_between_3_Frames(ball) :
+    ball_coordi_now = ball.coordi_list[-1].get_center()
+    ball_coordi_pre_1 = ball.coordi_list[-2].get_center()
+    ball_coordi_pre_2 = ball.coordi_list[-3].get_center()
+
+    vector_now = np.asarray([ball_coordi_now[0] - ball_coordi_pre_1[0], ball_coordi_now[1] - ball_coordi_pre_1[1]])
+    vector_pre = np.asarray([ball_coordi_pre_1[0] - ball_coordi_pre_2[0], ball_coordi_pre_1[1] - ball_coordi_pre_2[1]])
+
+    vectors_dot = np.dot( vector_now, vector_pre)
+
+    moving_angle = np.arccos( vectors_dot / (np.linalg.norm(vector_now) * np.linalg.norm(vector_pre)))
+
+    return moving_angle
+
 def determine_crush_stack(ball_crush_stack, FirstMovingBall_COLOR, BALLS, now) :
-    target_color_idx = FirstMovingBall_COLOR# crush_stack을 올릴 공의 index
-    is_Stack_value = 0
+    target_color_idx = FirstMovingBall_COLOR # crush_stack을 올릴 공의 index
+    target_ball_1_idx = None
+    target_ball_2_idx = None
 
     red_ball = BALLS[0]
     white_ball = BALLS[1]
     yellow_ball = BALLS[2]
 
+    myball = None
     target_ball_1 = None
     target_ball_2 = None
 
+    target_ball1_crush_count_binary = 0
+    target_ball2_crush_count_binary = 0
+
     if target_color_idx == BALL_COLOR['RED'] :
+        target_ball_1_idx = BALL_COLOR['WHITE']
+        target_ball_2_idx = BALL_COLOR['YELLOW']
+        myball = red_ball
         target_ball_1 = white_ball
         target_ball_2 = yellow_ball
+        
     elif target_color_idx == BALL_COLOR['WHITE'] :
+        target_ball_1_idx = BALL_COLOR['YELLOW']
+        target_ball_2_idx = BALL_COLOR['RED']
+        myball = white_ball
         target_ball_1 = yellow_ball
         target_ball_2 = red_ball
     elif target_color_idx == BALL_COLOR['YELLOW'] :
+        target_ball_1_idx = BALL_COLOR['RED']
+        target_ball_2_idx = BALL_COLOR['WHITE']
+        myball = yellow_ball
         target_ball_1 = red_ball
         target_ball_2 = white_ball
 
-    
-    if ball_crush_stack[target_color_idx] == 0 :
-        if type(target_ball_1.movingStartTime) == type(0) and type(target_ball_2.movingStartTime) == type(0) :
-            is_Stack_value = 0
-        else : 
-            if type(target_ball_1.movingStartTime) == type(now) and type(target_ball_2.movingStartTime) == type(now) : # 한 번에 두개의 공을 침
-                is_Stack_value = 2
+    if sum(ball_crush_stack) == 1 :
+        if type(target_ball_1.movingStartTime) == type(now) or type(target_ball_2.movingStartTime) == type(now) :
+            if type(target_ball_1.movingStartTime) == type(now) and type(target_ball_2.movingStartTime) == type(now) : # 한 번에 두개의 공을 침                 
+                if get_distance(myball, target_ball_1) < get_distance(myball, target_ball_2):
+                    target_ball1_crush_count_binary = 1
+                elif get_distance(myball, target_ball_2) < get_distance(myball, target_ball_1):
+                    target_ball2_crush_count_binary = 1
+                elif abs(get_distance(myball, target_ball_2) - get_distance(myball, target_ball_1)) <= 3.0 :
+                    target_ball1_crush_count_binary = 1
+                    target_ball2_crush_count_binary = 1
             else : 
-                is_Stack_value = 1
-    elif ball_crush_stack[target_color_idx] == 1 :
-        if type(target_ball_1.movingStartTime) == type(now) and type(target_ball_2.movingStartTime) == type(now) :
-            is_Stack_value = 1
-
-    ball_crush_stack[target_color_idx] += is_Stack_value
+                if get_distance(myball, target_ball_1) < get_distance(myball, target_ball_2) :    
+                    target_ball1_crush_count_binary = 1
+                else :
+                    target_ball2_crush_count_binary = 1    
+    elif sum(ball_crush_stack) == 2 :
+        # think the situation when ball i didn't hit using stick hit other ball
+        if type(target_ball_1.movingStartTime) == type(now) and type(target_ball_2.movingStartTime) == type(now) : # 공 근처를 지나가기만 해도 움직인 것으로 판정됨  
+            if get_distance(myball, target_ball_1) < get_distance(myball, target_ball_2) :    
+                target_ball1_crush_count_binary = 1
+            else :
+                target_ball2_crush_count_binary = 1   
+    if ball_crush_stack[target_ball_1_idx] == 0 :
+        ball_crush_stack[target_ball_1_idx] = target_ball1_crush_count_binary
+    if ball_crush_stack[target_ball_2_idx] == 0 :
+        ball_crush_stack[target_ball_2_idx] = target_ball2_crush_count_binary
 
     return ball_crush_stack
 
-
-def detect_biliard_ball(model, image, device, window_name, BALLS, score, FirstMovingBall_COLOR, Waiting_start_time, ball_crush_stack, img_size = 416) : # 입력받은 프레임을 가지고 공 탐지
+# 공 탐지 + 출력, 충돌여부 판단, 점수 득점여부 판단 등 모든걸 수행하는 함수
+# 모델을 학습시킬 때 RGB형식의 3채널 이미지를 사용하게끔 학습시켰기 때문에 opencv에서 얻은 BGR이미지를 RGB이미지로 변경 후 YOLOv3에 넣는다
+def detect_biliard_ball(model, image, device, window_name, BALLS, score, FirstMovingBall_COLOR, Waiting_start_time, ball_crush_stack,  img_size = 416) : 
 
     time_start = timeit.default_timer() # start time
 
     ori_image = image.copy() # 공을 그리기 전의 이미지
 
     # 공들의 좌표를 출력하기 위해 사용하는 BALL 클래스의 객체들
-    white_ball = BALLS[0]
-    yellow_ball = BALLS[1]
-    red_ball = BALLS[2]
+    red_ball = BALLS[0]
+    white_ball = BALLS[1]
+    yellow_ball = BALLS[2]
     
     # 입력받은 프레임을 전처리
     input_img = transforms.Compose([
@@ -137,22 +178,22 @@ def detect_biliard_ball(model, image, device, window_name, BALLS, score, FirstMo
     moving_yellow_ball_coordi_group = detections[detections[:,5] == MOVING_YELLOW_BALL_INDEX]
 
     # 특정 조건을 만족하는 bbox만 사용
-    threashold_area = 3000.0
+    threashold_area_ball = 5000.0
 
     if red_ball_coordi_group.size()[0] > 0 :
-        red_ball_coordi_group = filter_in_BiliardField(red_ball_coordi_group, threashold_area)
+        red_ball_coordi_group = filter_in_BiliardField(red_ball_coordi_group, threashold_area_ball)
     if white_ball_coordi_group.size()[0] > 0 :
-        white_ball_coordi_group = filter_in_BiliardField(white_ball_coordi_group, threashold_area)
+        white_ball_coordi_group = filter_in_BiliardField(white_ball_coordi_group, threashold_area_ball)
     if yellow_ball_coordi_group.size()[0] > 0 :
-        yellow_ball_coordi_group = filter_in_BiliardField(yellow_ball_coordi_group, threashold_area)
+        yellow_ball_coordi_group = filter_in_BiliardField(yellow_ball_coordi_group, threashold_area_ball)
         
     if moving_red_ball_coordi_group.size()[0] > 0 :
-        moving_red_ball_coordi_group = filter_in_BiliardField(moving_red_ball_coordi_group, threashold_area)
+        moving_red_ball_coordi_group = filter_in_BiliardField(moving_red_ball_coordi_group, threashold_area_ball)
     if moving_white_ball_coordi_group.size()[0] > 0 :
-        moving_white_ball_coordi_group = filter_in_BiliardField(moving_white_ball_coordi_group, threashold_area)
+        moving_white_ball_coordi_group = filter_in_BiliardField(moving_white_ball_coordi_group, threashold_area_ball)
     if moving_yellow_ball_coordi_group.size()[0] > 0 :
-        moving_yellow_ball_coordi_group = filter_in_BiliardField(moving_yellow_ball_coordi_group, threashold_area)
-
+        moving_yellow_ball_coordi_group = filter_in_BiliardField(moving_yellow_ball_coordi_group, threashold_area_ball)
+   
     # 따로 모은 것들에서 가장 confience가 높은 것을 하나씩 뽑음
     # 여기서 얻은 ball_coordi들을 YOLOv3가 탐지한 공들의 좌표로 사용한다
     if red_ball_coordi_group.size()[0] > 0 :
@@ -187,42 +228,43 @@ def detect_biliard_ball(model, image, device, window_name, BALLS, score, FirstMo
         moving_yellow_ball_coordi = np.asarray([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
     # confidence score보고 moving ball과 ball중 하나를 공의 좌표로 선정
-    isHit = False
-    if Waiting_start_time != None : 
-        isHit = True
     if moving_red_ball_coordi[4] > red_ball_coordi[4] :
         target_bbox = moving_red_ball_coordi
     else :
         target_bbox = red_ball_coordi
-    isSETCOORDI_RED = red_ball.set_coordi(image.copy(), target_bbox, isHit)
+    isSETCOORDI_RED, FirstMovingBall_COLOR, ball_crush_stack = red_ball.set_coordi(image.copy(), target_bbox, FirstMovingBall_COLOR, ball_crush_stack)
 
     if moving_white_ball_coordi[4] > white_ball_coordi[4] :
         target_bbox = moving_white_ball_coordi
     else :
         target_bbox = white_ball_coordi
-    isSETCOORDI_WHITE = white_ball.set_coordi(image.copy(), target_bbox, isHit)
-
+    isSETCOORDI_WHITE, FirstMovingBall_COLOR, ball_crush_stack = white_ball.set_coordi(image.copy(), target_bbox, FirstMovingBall_COLOR, ball_crush_stack)
 
     if moving_yellow_ball_coordi[4] > yellow_ball_coordi[4] :
         target_bbox = moving_yellow_ball_coordi
     else :
         target_bbox = yellow_ball_coordi
-    isSETCOORDI_YELLOW = yellow_ball.set_coordi(image.copy(), target_bbox, isHit)
+    isSETCOORDI_YELLOW, FirstMovingBall_COLOR, ball_crush_stack = yellow_ball.set_coordi(image.copy(), target_bbox, FirstMovingBall_COLOR, ball_crush_stack)
 
-    # set first moving ball
-    now = datetime.datetime.now()
-    if type(red_ball.movingStartTime) == type(now) and type(white_ball.movingStartTime) == type(0) and type(yellow_ball.movingStartTime) == type(0) :
-        FirstMovingBall_COLOR = BALL_COLOR['RED']
-    elif type(red_ball.movingStartTime) == type(0) and type(white_ball.movingStartTime) == type(now) and type(yellow_ball.movingStartTime) == type(0) :
-        FirstMovingBall_COLOR = BALL_COLOR['WHITE']
-    elif type(red_ball.movingStartTime) == type(0) and type(white_ball.movingStartTime) == type(0) and type(yellow_ball.movingStartTime) == type(now) :
-        FirstMovingBall_COLOR = BALL_COLOR['YELLOW']
+    # see_multiballs_bbox(image.copy(), [two_balls_coordi, three_balls_coordi])
+
+
+    isCaptureFrame = False # 지금 사용중인 프레임을 이미지 파일로 저장할지 말지 결정하는데 쓰이는 Boolean 변수. 프레임에서 탐지가 안되는 공이 있을 경우 True가 된다.
     
-    if FirstMovingBall_COLOR != None : 
+    # 만약 탐지되지 않은 공이 있으면 캡처 후 데이터셋 증축에 사용
+    if isSETCOORDI_RED == True and isSETCOORDI_WHITE == True and isSETCOORDI_YELLOW == True : 
+        isCaptureFrame = True
+    
+    can_determine_crush = False
+    if len(red_ball.coordi_list) > 0 and len(white_ball.coordi_list) > 0 and len(yellow_ball.coordi_list) > 0 :
+        can_determine_crush = True
+
+    now = datetime.datetime.now()
+    if FirstMovingBall_COLOR != None and can_determine_crush == True : 
         ball_crush_stack = determine_crush_stack(ball_crush_stack, FirstMovingBall_COLOR, BALLS, now)
 
     if red_ball.status == STATUS['WAITING'] and  white_ball.status == STATUS['WAITING'] and yellow_ball.status == STATUS['WAITING'] and FirstMovingBall_COLOR != None and len(red_ball.coordi_list) > 1 and len(white_ball.coordi_list) > 1 and len(yellow_ball.coordi_list) > 1:
-        if red_ball.isMoving_oneTIME == True and white_ball.isMoving_oneTIME == True and yellow_ball.isMoving_oneTIME == True : 
+        if ball_crush_stack[FirstMovingBall_COLOR] == 2 : 
                 score +=1
         
         if Waiting_start_time == None :
@@ -266,17 +308,8 @@ def detect_biliard_ball(model, image, device, window_name, BALLS, score, FirstMo
         elif detect_bbox.color_idx == BALL_COLOR['YELLOW'] :
             color = (230,204,0)
         
-        if len(detect_bbox.coordi_list) > 1 and FirstMovingBall_COLOR != None :
-            for i in range(1, len(detect_bbox.coordi_list)) : 
-                cv2.arrowedLine(image, detect_bbox.coordi_list[i - 1].get_center(), detect_bbox.coordi_list[i].get_center(), color, 3, tipLength=0.2, line_type=4)
-        
-        # print last coordinate of ball as more bigger circle
-        # I think there are some bugs in this area(22.02.16)
-        # first_moving_ball 판단하는 코드에 버그가 있는듯 하다. 
         if len(detect_bbox.coordi_list) > 0 :
-            print(detect_bbox.coordi_list[-1].r)
             cv2.circle(image, detect_bbox.coordi_list[-1].get_center(), detect_bbox.coordi_list[-1].r, color, -1)
-        
     time_end = timeit.default_timer() # end time 
     FPS = int(1./(time_end - time_start ))
 
@@ -294,13 +327,10 @@ def detect_biliard_ball(model, image, device, window_name, BALLS, score, FirstMo
         distance_wy_str = "distance_white_yellow : " + str(distance_white_with_yellow)
         distance_yr_str = "distance_yellow_red : " + str(distance_yellow_with_red)
 
-        ball_crush_stack_print = "ball_crush_stack : " + str(ball_crush_stack)
-
         cv2.putText(image, distance_rw_str, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1,(255,0,0),2)
         cv2.putText(image, distance_wy_str, (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1,(255,0,0),2)
         cv2.putText(image, distance_yr_str, (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 1,(255,0,0),2)
-        cv2.putText(image, ball_crush_stack_print, (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 1,(255,0,0),2)
-
+        
     if FirstMovingBall_COLOR != None :
         color_str = None
         if FirstMovingBall_COLOR == BALL_COLOR['RED'] :
@@ -311,11 +341,14 @@ def detect_biliard_ball(model, image, device, window_name, BALLS, score, FirstMo
             color_str = 'YELLOW'
         print_color_str = "YourBall : " + color_str
 
+        ball_crush_stack_print = "ball_crush_stack : " + str(sum(ball_crush_stack) - 1)
+        cv2.putText(image, ball_crush_stack_print, (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 1,(255,0,0),2)
+
         cv2.putText(image, print_color_str, (900, 70), cv2.FONT_HERSHEY_SIMPLEX, 1,(255,0,0),2)
         if Waiting_start_time != None : 
             print_waitingtime_str = "Waiting Time : " + str((now - Waiting_start_time).total_seconds())
             cv2.putText(image, print_waitingtime_str, (900, 110), cv2.FONT_HERSHEY_SIMPLEX, 1,(255,0,0),2)
 
-    cv2.imshow(window_name, image[:, :, [2, 1, 0]]) # RGB -> BGR변환. opencv는 BGR을 사용한다
+    cv2.imshow(window_name, image[:, :, [2, 1, 0]]) # RGB -> BGR변환해서 출력. opencv는 BGR을 사용한다
 
-    return ori_image[:, :, [2, 1, 0]], score, FirstMovingBall_COLOR, Waiting_start_time, ball_crush_stack
+    return isCaptureFrame, ori_image[:, :, [2, 1, 0]], score, FirstMovingBall_COLOR, Waiting_start_time, ball_crush_stack
