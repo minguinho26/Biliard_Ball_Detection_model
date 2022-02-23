@@ -161,8 +161,8 @@ labelme를 이용해 모든 이미지에 대한 라벨링을 수행한 뒤, YOLO
    <img width="800" alt="스크린샷 2022-02-06 오전 11 53 51" src="https://user-images.githubusercontent.com/50979281/152666050-a14a7d70-834d-4779-8315-f4f06d5e2159.png">
 
 <br><br>
-**3. [다운로드 링크](https://drive.google.com/file/d/1zTg7EjaQl8jDPNKHIN_6mAq70_qWeWBx/view?usp=sharing)에서 가중치 파일을 다운받은 뒤 yolov3 폴더에 넣어줍니다.**
-   <img width="800" alt="스크린샷 2022-02-06 오전 11 52 07" src="https://user-images.githubusercontent.com/50979281/152665998-e5f8593f-d118-476e-95e4-8ce06816378f.png">
+**3. [가중치 파일](https://drive.google.com/file/d/1hSL4T-Lo9RUfxuKP3n9zCtKsuUwDJ83W/view?usp=sharing)을 다운받은 뒤 yolov3 폴더에 넣어줍니다.**
+   <img width="800" alt="스크린샷 2022-02-06 오전 11 52 07" src="https://user-images.githubusercontent.com/50979281/155050081-a8b24dfd-c105-4ae8-ace3-0baf81826b32.png">
 
 <br><br>
 **4. 터미널을 실행 후 cd 명령어를 이용해 레포지토리가 있는 경로로 이동 후 'python ball_detect_program.py'를 입력해 프로그램을 실행합니다.** 
