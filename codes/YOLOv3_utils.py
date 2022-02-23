@@ -66,7 +66,7 @@ def rescale_boxes(boxes, current_dim, original_shape): # current_dim은 YOLOv3�
 # pytorchyolo/utils/utils.py의 non_max_suppression를 수정한 메소드
 # YOLOv3에서 얻은 bbox는 [x_center, y_center, width, height, confidence, cls_preds]로 구성된다.
 # 이를 사용하기 편하게 [x_center, y_center, width, height, confidence, 탐지한 객체의 index]로 바꿔주며 바꾸는 과정에서 NMS를 수행해 iou가 일정수치 이상인 bbox만 이용한다
-def change_bbox_to_use(prediction, conf_thres=0.0): # prediction : [16, 10647, 8]
+def change_bbox_to_use(prediction, conf_thres=0.001): # prediction : [16, 10647, 8]
     # Settings
     max_nms = 2000  # maximum number of boxes into torchvision.ops.nms()
 

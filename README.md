@@ -7,7 +7,18 @@ YOLOv3을 이용한 당구공 탐지 프로그램입니다. PyTorch를 기반으
 
 <img width="363" alt="스크린샷 2022-02-21 오후 9 19 03" src="https://user-images.githubusercontent.com/50979281/154954133-8f9a13f2-1c83-4cc2-b7ff-f0804dce474e.png">
 
-이렇게 추출한 영역에서 opencv의 [cv2.HoughCircles()](https://docs.opencv.org/3.4/da/d53/tutorial_py_houghcircles.html)를 사용해 공의 정확한 위치를 알아냅니다. 이 때 하나의 bbox내에 여러개의 공이 들어있는 경우가 있기 때문에 HoughCircles()을 사용하기 전에 RGB 채널을 이용해 특정 색상(빨간색, 흰색, 노란색)을 검출하는 연산을 수행하여 원하는 공을 쉽게 검출할 수 있게 만들어줍니다. 
+이렇게 추출한 뒤 hsv영역에서 필터를 만들어 원하는 색상만 검출합니다. 
+
+그리고 findContours()을 사용해 '공으로 판단한 덩어리'를 감싸는 폐곡선을 탐지, **폐곡선이 둘러싼 덩어리의 무게중심**을 공의 중심좌표, **(덩어리의 넓이/2)의 제곱근**을 공의 반지름으로 판단합니다. 
+
+~~~python
+M = cv2.moments(cnt)
+cX = int(M['m10'] / M['m00'])
+cY = int(M['m01'] / M['m00'])
+radius = np.sqrt(area/ 2).astype(np.int32)
+~~~
+위와 같은 방법으로 공의 중심좌표, 반지름을 알아냅니다.
+
 
 > 위 사진에서 'yellow_bbox_window_ori'에 있는 이미지가 특정 색상(노란색)을 검출하기 전이고 'yellow_bbox_window'에 있는 이미지가 특정 색상만 검출한 이미지입니다. 
 

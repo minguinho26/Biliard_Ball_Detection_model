@@ -3,6 +3,9 @@
 # 생성일 : 2022.1.21
 # 제작자 : 김민규
 
+from tkinter import scrolledtext
+
+from cv2 import circle
 from codes.YOLOv3_models import *
 from codes.detect_BiliardBall_usingYOLOv3 import *
 import numpy as np
@@ -11,6 +14,7 @@ import cv2
 
 # 이미지 저장에 사용
 import datetime
+from PIL import Image
 
 # NOTHING : 아직 상태가 안정해짐 or 현재 프레임에서 공을 탐지하지 못함, WAITING : 가만히 있는 상태, MOVING : 공이 움직이는 상태
 global STATUS
@@ -31,116 +35,145 @@ class COORDI :
 class BALL :
     def __init__(self, color_idx) :
         # opencv에서 이미지에 도형 그릴 때 필요한 값들
-        self.coordi_list = []
+        self.coordi_list = [] # 공의 좌표를 기록하는 곳
         # 색깔의 index
         self.color_idx = color_idx
         self.status = STATUS['NOTHING']
         self.isMoving_oneTIME = False
         self.movingStartTime = 0
         
+    # 마스크를 만드는 함수. 이걸로 만든 마스크로 특정 조건을 만족하는 픽셀들을 제거한다
+    def set_mask(self, mask, FILTERS) :
+
+        for filter in FILTERS :
+            mask[filter] = 0
+        return mask
+
     # bbox를 BALL에 저장하는 메소드
-    # extract bbox in image and use HoughCircles() to get more precise ball's coordinate and radius
-    # HoughCircles로 빨간공이 잘 탐지되지 않는 문제가 있다. 어떻게 해결하면 되는걸까
     def set_coordi(self, image, coordi, FirstMovingBall_COLOR, ball_crush_stack) :
         isSetCOORDI = False # 현재 프레임에서 공을 탐지했는가?
+
+        # YOLO가 공이 포함된 bbox를 탐지했으면
         if np.sum(np.abs(coordi)) != 0 :
             coordi[coordi[:] < 0] = 0.0
             ball_with_bbox = image[np.floor(coordi[1]).astype(np.int32):np.ceil(coordi[3]).astype(np.int32), np.floor(coordi[0]).astype(np.int32):np.ceil(coordi[2]).astype(np.int32),:] 
             ball_with_bbox = ball_with_bbox[:, :, [2, 1, 0]]
 
-            diff_R_G = np.abs(ball_with_bbox[:,:,2].astype(np.int32) - ball_with_bbox[:,:,1].astype(np.int32))
-            diff_B_R = np.abs(ball_with_bbox[:,:,0].astype(np.int32) - ball_with_bbox[:,:,2].astype(np.int32))
-            diff_B_G = np.abs(ball_with_bbox[:,:,0].astype(np.int32) - ball_with_bbox[:,:,1].astype(np.int32))
-            
-            if self.color_idx == BALL_COLOR['RED'] :
-                remove_whiteball = np.where((diff_B_R[:,:] < 30) & (ball_with_bbox[:,:, 0] > 180) & (ball_with_bbox[:,:, 1] > 180) & (ball_with_bbox[:,:, 2] > 180))
-                remove_yellowball = np.where((diff_R_G[:,:] < 60) & (ball_with_bbox[:,:,0] < 220))
-                ball_with_bbox_grayscale = cv2.cvtColor(ball_with_bbox, cv2.COLOR_BGR2GRAY)
-                ball_with_bbox_grayscale[remove_whiteball] = 0 
-                ball_with_bbox_grayscale[remove_yellowball] = 0
+            bbox_w = ball_with_bbox.shape[1]
+            bbox_h = ball_with_bbox.shape[0]
 
-            elif self.color_idx == BALL_COLOR['WHITE'] :
-                white_ball_filter = np.where((diff_B_R[:,:] > 10) & (ball_with_bbox[:,:, 0] < 210) | (ball_with_bbox[:,:, 1] < 210) | (ball_with_bbox[:,:, 2] < 210))
-                ball_with_bbox_grayscale = cv2.cvtColor(ball_with_bbox, cv2.COLOR_BGR2GRAY)
-                ball_with_bbox_grayscale[white_ball_filter] = 0 
+            # hsv로 변경 후 빨간공, 흰공, 노란공을 탐지
+            ball_with_bbox_hsv = cv2.cvtColor(ball_with_bbox, cv2.COLOR_BGR2HSV)
+
+            mask = np.ones((bbox_h, bbox_w ))
+            max_val_RGB = np.argmax(ball_with_bbox, axis=2) # max value index of RGB of pixel in bbox
+
+            # 원하는 색상의 공을 찾기 위한 필터링을 실시=======================================================
+            if self.color_idx == BALL_COLOR['RED'] :
+                filter_channel_max_pixel = np.where((max_val_RGB[:,:] == 0)) # 파란색이 제일 높은값을 가지는 픽셀을 제외
                 
-            elif self.color_idx == BALL_COLOR['YELLOW'] :
-                remove_redball = np.where((diff_R_G[:,:] >  60) & (ball_with_bbox[:,:, 0] < 220))
-                remove_whiteball = np.where((diff_B_G < 80) & (ball_with_bbox[:,:,0] > 200))
-                ball_with_bbox_grayscale = cv2.cvtColor(ball_with_bbox, cv2.COLOR_BGR2GRAY)
-                ball_with_bbox_grayscale[remove_whiteball] = 0 
-                ball_with_bbox_grayscale[remove_redball] = 0 
+                remove_whiteball = np.where((ball_with_bbox_hsv[:,:,1] < 80)) # 흰색의 saturation을 검출 후 제거
+                remove_yellowball = np.where((ball_with_bbox_hsv[:,:,0] > 15) & (ball_with_bbox_hsv[:,:,0] < 165)) # 노란색과 흰색은 hue에서 차이를 보인다. 이점을 이용해 노란색을 검출한다
+                mask = self.set_mask(mask, [filter_channel_max_pixel, remove_whiteball, remove_yellowball]) # 빨간공을 제외한 나머지 것들을 제거하기 위한 마스크를 생성
+                
+                ball_with_bbox_grayscale = cv2.cvtColor(ball_with_bbox, cv2.COLOR_BGR2GRAY) # 흑백 이미지로 변환 후 mask로 빨간공, 노란공 등을 제거
+                # 특정 조건을 만족하는 픽셀들을 제거
+                ball_with_bbox_grayscale[mask < 1] = 0
+                ball_with_bbox_grayscale[ball_with_bbox_grayscale > 250] = 0
                 ball_with_bbox_grayscale[ball_with_bbox_grayscale < 120] = 0
 
-            # 덩어리가 뭉친 곳을 공이라 판정하는게 필요
-            circles = cv2.HoughCircles(ball_with_bbox_grayscale, cv2.HOUGH_GRADIENT, 1, 26, param1 = 300, param2 = 10, minRadius = 10, maxRadius = 15)  
-            isSetCOORDI = True
+            elif self.color_idx == BALL_COLOR['WHITE'] :
+                
+                filter_whiteball = np.where((ball_with_bbox_hsv[:,:,1] > 60))
 
+                mask = self.set_mask(mask, [filter_whiteball])
+                ball_with_bbox_grayscale = cv2.cvtColor(ball_with_bbox, cv2.COLOR_BGR2GRAY)
+                ball_with_bbox_grayscale[mask < 1] = 0
+                ball_with_bbox_grayscale[ball_with_bbox_grayscale[:,:] < 250] = 0
+                
+            elif self.color_idx == BALL_COLOR['YELLOW'] :
+                remove_whiteball = np.where((ball_with_bbox_hsv[:,:,1] < 80))
+                remove_redball = np.where((ball_with_bbox_hsv[:,:,0] <= 15) | (ball_with_bbox_hsv[:,:,0] >= 165))
+                remove_biliardfield = np.where((ball_with_bbox_hsv[:,:,2] < 200))
+
+                mask = self.set_mask(mask, [remove_whiteball, remove_redball, remove_biliardfield])
+                ball_with_bbox_grayscale = cv2.cvtColor(ball_with_bbox, cv2.COLOR_BGR2GRAY)
+                ball_with_bbox_grayscale[mask < 1] = 0
+            # 원하는 색상의 공을 찾기 위한 필터링을 실시=======================================================
+
+            isSetCOORDI = False
             temp_coordi = None
-            base_coordi = (coordi[0], coordi[1])# 전체 이미지에서 얻은 bbbox의 left-up 꼭지점 좌표
-            if type(circles) != type(None) :
-                avr_x = 0
-                avr_y = 0
-                avr_r = 0
-                count = 0
-                for i in circles[0]:
-                    if avr_x != 0 :
-                        diff_x = np.abs(avr_x - int(base_coordi[0] + i[0])).astype(np.float32)
-                        diff_y = np.abs(avr_y - int(base_coordi[1] + i[1])).astype(np.float32)
-                        distance = np.sqrt(diff_x * diff_x + diff_y * diff_y)
-                        if distance <= 5.0 :
-                            avr_x += int(base_coordi[0] + i[0])
-                            avr_y += int(base_coordi[1] + i[1])
-                            avr_r += np.ceil(i[2]).astype(np.int32)
-                            count += 1
-                    else : 
-                        avr_x += int(base_coordi[0] + i[0])
-                        avr_y += int(base_coordi[1] + i[1])
-                        avr_r += np.ceil(i[2]).astype(np.int32)
-                        count += 1
-                avr_x /= count
-                avr_y /= count
-                avr_r /= count
-                if self.color_idx == 2 :
-                    avr_r += 1
+            base_coordi = (coordi[0].astype(np.int32), coordi[1].astype(np.int32))# 전체 이미지에서 얻은 bbox의 left-up 꼭지점 좌표
+            
+            # 덩어리가 뭉친 곳을 공이라 판정
+            # 원래 HoughCircles()를 사용하여 공을 찾았는데 공의 모양대로 걸러지는 경우가 별로 없어서 '살아남은 픽셀'들을 감싼 폐곡선(contour)을 탐지, 폐곡선이 둘러싼 영역의 넓이가 특정값을 넘기면 이를 공으로 판단한다.
+            _,threshold = cv2.threshold(ball_with_bbox_grayscale, 110, 255, 
+                            cv2.THRESH_BINARY)
+            contours,_=cv2.findContours(threshold, cv2.RETR_TREE,
+                            cv2.CHAIN_APPROX_SIMPLE)
+                
+            for cnt in contours :
+                area = cv2.contourArea(cnt)
 
-                temp_coordi = COORDI(int(avr_x), int(avr_y), int(avr_r))
+                if area > 300:    
+                    # 무게중심 계산                   
+                    M = cv2.moments(cnt)
+                    cX = int(M['m10'] / M['m00'])
+                    cY = int(M['m01'] / M['m00'])
+                    radius = np.sqrt(area/ 2).astype(np.int32)
+                    
+                    # 원이 너무 크면 조정 
+                    if radius > 16 : 
+                        radius = 16
+
+                    # 좌표로 설정
+                    temp_coordi = COORDI(base_coordi[0] + cX, base_coordi[1] + cY, radius)
+            
+            # 공을 탐지했으면
             if temp_coordi != None :             
                 if len(self.coordi_list) >= 1 :
-                    
+                    # 공이 처음으로 움직였으면
                     if self.isMoving_oneTIME == False :
                         diff_with_initCOORDI_x = self.coordi_list[0].x - temp_coordi.x
                         diff_with_initCOORDI_y = self.coordi_list[0].y - temp_coordi.y
 
                         distance_with_initCOORDI = np.sqrt(diff_with_initCOORDI_x * diff_with_initCOORDI_x + diff_with_initCOORDI_y * diff_with_initCOORDI_y)
 
-                        if distance_with_initCOORDI > 8.0 : 
-                            self.status = STATUS['MOVING']
-                            self.movingStartTime = datetime.datetime.now()
+                        if distance_with_initCOORDI > 5.0 : # 지금까지 움직였던 거리가 일정한 값을 만족하면 '공이 움직이기 시작했다'고 판단한다 
+                            self.status = STATUS['MOVING'] # 공의 상태를 변경
+                            self.movingStartTime = datetime.datetime.now() # 움직이기 시작한 시간
+                            # 내가 친 공은 맨처음 움직인 공이 된다. 
                             if FirstMovingBall_COLOR == None :
                                 FirstMovingBall_COLOR = self.color_idx
                                 ball_crush_stack[FirstMovingBall_COLOR] = 1
                             self.isMoving_oneTIME = True
                         else : 
-                            self.status = STATUS['WAITING']
+                            self.status = STATUS['WAITING'] # 일정값을 만족하지 않으면 움직이지 않는다고 판단
+                    # 움직였던 공이었으면
                     else :
                         diff_with_preCOORDI_x = self.coordi_list[-1].x - temp_coordi.x
                         diff_with_preCOORDI_y = self.coordi_list[-1].y - temp_coordi.y
 
                         distance_with_preCOORDI = np.sqrt(diff_with_preCOORDI_x * diff_with_preCOORDI_x + diff_with_preCOORDI_y * diff_with_preCOORDI_y)
 
-                        if float(distance_with_preCOORDI) > 1.0 : 
+                        # 계속 움직이는 공은 완전히 멈출 때까지 움직인다고 판단
+                        if float(distance_with_preCOORDI) > 2.0 : 
                             self.status = STATUS['MOVING']
                         else :
                             self.status = STATUS['WAITING'] 
                     self.coordi_list.append(temp_coordi)
                 else : 
                     self.coordi_list.append(temp_coordi)
-
+            # 공을 탐지하지 못했을 때
+            else : 
+                self.status = STATUS['NOTHING']
+                if len(self.coordi_list) > 1 :
+                    del self.coordi_list[:-1]
+        # YOLO가 bbox를 탐지하지 못했을 경우
         else :
             self.status = STATUS['NOTHING']
-            if len(self.coordi_list) > 0 :
-                self.coordi_list.pop(0)
+            if len(self.coordi_list) > 1 :
+                del self.coordi_list[:-1]
                 
         return isSetCOORDI, FirstMovingBall_COLOR, ball_crush_stack
 
@@ -185,14 +218,28 @@ def main() :
     while True:
         # 찍고있는 카메라에서 캡처 상태와 찍고있는 프레임 얻기
         status, frame = capture.read() # qstatus는 boolean이고 frame은 numpy array다.
+        
+        fraem_copied = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        _,threshold = cv2.threshold(fraem_copied, 110, 255, cv2.THRESH_BINARY)
+        contours,_=cv2.findContours(threshold, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        for cnt in contours :
+            area = cv2.contourArea(cnt)
+            if area > 400: 
+                for cnt in contours :
+                    area = cv2.contourArea(cnt)
+                    epsilon = 0.02 * cv2.arcLength(cnt, True)
+                    approx = cv2.approxPolyDP(cnt, epsilon, True)
+                    cv2.drawContours(fraem_copied,[approx],0,(0,0,0),5)
+                    cv2.imshow('test_frame', fraem_copied)
 
         if not status:
             break
         elif cv2.waitKey(1) == ord('q') : # q 누르면 탈출
             break
-        frame = frame[:, :, [2, 1, 0]] # # BGR -> RGB. numpy와 pytorch는 RGB를 사용한다 
-        frame, score, FirstMovingBall_COLOR, Waiting_start_time, ball_crush_stack = detect_biliard_ball(model, frame.copy(), device, 'Detect_ball', [red_ball, white_ball, yellow_ball], score, FirstMovingBall_COLOR, Waiting_start_time, ball_crush_stack) # 공 탐지 후 화면에 보여줌
 
+        # numpy와 pytorch는 RGB를 사용하는데 opencv는 BGR을 사용하기 때문에 변환한 값을 넣어준다
+        score, FirstMovingBall_COLOR, Waiting_start_time, ball_crush_stack = detect_biliard_ball(model, frame.copy()[:, :, [2, 1, 0]], device, 'Detect_ball', [red_ball, white_ball, yellow_ball], score, FirstMovingBall_COLOR, Waiting_start_time, ball_crush_stack) # 공 탐지 후 화면에 보여줌
     capture.release() # 캡처 중지
     cv2.destroyAllWindows() # 화면 생성 중단
 
